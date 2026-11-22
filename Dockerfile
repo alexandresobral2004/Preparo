@@ -23,7 +23,7 @@ COPY --from=frontend /build/dist frontend/dist
 
 RUN useradd --system --uid 10001 app && mkdir -p /data && chown app /data
 USER app
-VOLUME /data
+# O volume em /data é criado como Railway Volume (a instrução VOLUME não é aceita na Railway).
 EXPOSE 8000
 
 # Um único worker: o bloqueio de tentativas de login fica na memória do processo e o SQLite aceita um escritor por vez.
