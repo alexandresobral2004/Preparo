@@ -1,0 +1,21 @@
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# dependências, caches e artefatos de build (regeneráveis)
+node_modules/
+.pnpm-store/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# dados locais e segredos: nunca versionar
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*

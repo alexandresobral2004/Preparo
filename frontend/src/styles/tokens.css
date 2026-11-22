@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light;
+  /* Modo dia: azul céu (fundo), branco (cartões), verde de mata (marca), amarelo ouro (destaque) */
+  --bg-page: #e3f1fa;
+  --bg-card: #ffffff;
+  --bg-elevated: #f2f9fd;
+  --bg-input: #f8fcff;
+  --bg-locked: #dcebf5;
+  --border-subtle: #c5dfee;
+  --border-strong: #94bdd6;
+
+  --text-primary: #12301f;
+  --text-secondary: #2f4a3b;
+  --text-muted: #52695a;
+
+  --brand: #1d5c36;
+  --brand-hover: #154a2b;
+  --brand-soft: #dcefe0;
+  --brand-contrast: #ffffff;
+
+  /* Ouro: só decoração (barras, realces); não usar como texto nem contorno de foco */
+  --accent: #d4a017;
+  --accent-soft: #fdf2cc;
+
+  /* Estados das panelas (RU-05 / sem conflito semântico) */
+  --state-empty-border: #c5dfee;
+  --state-gray: #6b7280;
+  --state-gray-bg: #f3f4f6;
+  --state-green: #1f7a4c;
+  --state-green-bg: #e8f6ee;
+  --state-amber: #b45309;
+  --state-amber-bg: #fef6e4;
+  --state-crimson: #9f2b3a;
+  --state-crimson-bg: #fbecee;
+
+  /* Alertas críticos (vermelho vivo distinto de Colhida) */
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --danger-text: #991b1b;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --warn-text: #78350f;
+
+  --shadow-sm: 0 1px 3px rgba(18, 48, 31, 0.08);
+  --shadow-md: 0 6px 20px rgba(18, 48, 31, 0.1);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-page: #0f1713;
+  --bg-card: #17231d;
+  --bg-elevated: #1e2e26;
+  --bg-input: #121c17;
+  --bg-locked: #21342b;
+  --border-subtle: #293e33;
+  --border-strong: #395547;
+
+  --text-primary: #e8efe9;
+  --text-secondary: #b7c8bc;
+  --text-muted: #8aa092;
+
+  --brand: #43a87a;
+  --brand-hover: #52bc8b;
+  --brand-soft: #1b3b2c;
+  --brand-contrast: #08150e;
+
+  --accent: #f5b82e;
+  --accent-soft: #2f2511;
+
+  --state-empty-border: #293e33;
+  --state-gray: #9ca3af;
+  --state-gray-bg: #1e262b;
+  --state-green: #34c77b;
+  --state-green-bg: #143223;
+  --state-amber: #f5b82e;
+  --state-amber-bg: #2f2511;
+  --state-crimson: #e05a68;
+  --state-crimson-bg: #32181d;
+
+  --danger: #ff6b6b;
+  --danger-bg: #3b1719;
+  --danger-text: #ffb4b4;
+  --warn: #f5b82e;
+  --warn-bg: #33270f;
+  --warn-text: #fde68a;
+
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+}

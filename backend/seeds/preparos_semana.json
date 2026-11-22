@@ -1,0 +1,563 @@
+[
+  {
+    "id": "seed-2026-11-13-a",
+    "salvoEm": "2026-11-13T18:30:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-13",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "",
+    "mariri": "Caupuri",
+    "maririKg": 300,
+    "chacrona": [
+      {
+        "nucleo": "Caupuri",
+        "kg": 18
+      },
+      {
+        "nucleo": "Tucunacá",
+        "kg": 12
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de sexta-feira com dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:30",
+            "fervura": "07:05",
+            "colhida": "10:35",
+            "litros": 10.2,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:35",
+            "fervura": "07:10",
+            "colhida": "10:40",
+            "litros": 10.05,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 3,
+            "tipo": "2ª vez",
+            "entrada": "06:45",
+            "fervura": "07:20",
+            "colhida": "10:55",
+            "litros": 10.3,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "06:50",
+            "fervura": "07:25",
+            "colhida": "11:00",
+            "litros": 9.95,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 5,
+            "tipo": "APURO",
+            "entrada": "07:00",
+            "fervura": "07:40",
+            "colhida": "11:20",
+            "litros": 10.15,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "seed-2026-11-14-a",
+    "salvoEm": "2026-11-14T18:30:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-14",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "",
+    "mariri": "Tucunacá",
+    "maririKg": 400,
+    "chacrona": [
+      {
+        "nucleo": "Tucunacá",
+        "kg": 24
+      },
+      {
+        "nucleo": "Caupuri",
+        "kg": 16
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de sábado com dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:30",
+            "fervura": "07:05",
+            "colhida": "10:35",
+            "litros": 10.25,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:35",
+            "fervura": "07:10",
+            "colhida": "10:40",
+            "litros": 10.1,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 3,
+            "tipo": "2ª vez",
+            "entrada": "06:45",
+            "fervura": "07:20",
+            "colhida": "10:55",
+            "litros": 10.35,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "06:50",
+            "fervura": "07:25",
+            "colhida": "11:00",
+            "litros": 10.0,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 5,
+            "tipo": "APURO",
+            "entrada": "07:00",
+            "fervura": "07:40",
+            "colhida": "11:20",
+            "litros": 10.2,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "seed-2026-11-15-a",
+    "salvoEm": "2026-11-15T18:30:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-15",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "",
+    "mariri": "Caupuri",
+    "maririKg": 600,
+    "chacrona": [
+      {
+        "nucleo": "Caupuri",
+        "kg": 36
+      },
+      {
+        "nucleo": "Tucunacá",
+        "kg": 24
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de domingo com dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:30",
+            "fervura": "07:05",
+            "colhida": "10:35",
+            "litros": 10.15,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:35",
+            "fervura": "07:10",
+            "colhida": "10:40",
+            "litros": 10.0,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 3,
+            "tipo": "2ª vez",
+            "entrada": "06:45",
+            "fervura": "07:20",
+            "colhida": "10:55",
+            "litros": 10.25,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "06:50",
+            "fervura": "07:25",
+            "colhida": "11:00",
+            "litros": 9.9,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 5,
+            "tipo": "APURO",
+            "entrada": "07:00",
+            "fervura": "07:40",
+            "colhida": "11:20",
+            "litros": 10.1,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "seed-2026-11-20-a",
+    "salvoEm": "2026-11-20T18:30:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-20",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "",
+    "mariri": "Tucunacá",
+    "maririKg": 118.5,
+    "chacrona": [
+      {
+        "nucleo": "Caupuri",
+        "kg": 7.5
+      },
+      {
+        "nucleo": "Tucunacá",
+        "kg": 4.5
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de sexta-feira com dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:30",
+            "fervura": "07:05",
+            "colhida": "10:35",
+            "litros": 10.2,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:35",
+            "fervura": "07:10",
+            "colhida": "10:40",
+            "litros": 10.05,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 3,
+            "tipo": "2ª vez",
+            "entrada": "06:45",
+            "fervura": "07:20",
+            "colhida": "10:55",
+            "litros": 10.3,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "06:50",
+            "fervura": "07:25",
+            "colhida": "11:00",
+            "litros": 9.95,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          },
+          {
+            "numero": 5,
+            "tipo": "APURO",
+            "entrada": "07:00",
+            "fervura": "07:40",
+            "colhida": "11:20",
+            "litros": 10.15,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.4,
+            "pesoCheiaKg": 37.8
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "seed-2026-11-21-a",
+    "salvoEm": "2026-11-21T13:10:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-21",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "Responsável Seed 2",
+    "mariri": "Caupuri",
+    "maririKg": 96,
+    "chacrona": [
+      {
+        "nucleo": "Tucunacá",
+        "kg": 5.5
+      },
+      {
+        "nucleo": "Caupuri",
+        "kg": 4.25
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de sábado com dois blocos, dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "Bloco 1 sem intercorrências.",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:20",
+            "fervura": "06:55",
+            "colhida": "10:25",
+            "litros": 10.1,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:25",
+            "fervura": "07:00",
+            "colhida": "10:30",
+            "litros": 10.25,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 3,
+            "tipo": "3ª vez",
+            "entrada": "06:40",
+            "fervura": "07:15",
+            "colhida": "10:50",
+            "litros": 10,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "06:55",
+            "fervura": "07:30",
+            "colhida": "11:05",
+            "litros": 10.2,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 5,
+            "tipo": "2ª vez",
+            "entrada": "07:05",
+            "fervura": "07:40",
+            "colhida": "11:15",
+            "litros": 9.9,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          }
+        ]
+      },
+      {
+        "obs": "Bloco 2 começou após troca de lenha.",
+        "panelas": [
+          {
+            "numero": 6,
+            "tipo": "APURO",
+            "entrada": "07:30",
+            "fervura": "08:05",
+            "colhida": "11:45",
+            "litros": 10.15,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 7,
+            "tipo": "1ª vez",
+            "entrada": "07:35",
+            "fervura": "08:10",
+            "colhida": "11:50",
+            "litros": 10.1,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 8,
+            "tipo": "3ª vez",
+            "entrada": "07:45",
+            "fervura": "08:20",
+            "colhida": "12:00",
+            "litros": 10.05,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 9,
+            "tipo": "1ª vez",
+            "entrada": "07:50",
+            "fervura": "08:25",
+            "colhida": "12:05",
+            "litros": 10.3,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          },
+          {
+            "numero": 10,
+            "tipo": "2ª vez",
+            "entrada": "08:00",
+            "fervura": "08:35",
+            "colhida": "12:15",
+            "litros": 10.15,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.6,
+            "pesoCheiaKg": 38.1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "seed-2026-11-22-a",
+    "salvoEm": "2026-11-22T09:15:00-03:00",
+    "nucleo": "Bendito Filho",
+    "data": "2026-11-22",
+    "mestre": "Mestre Seed",
+    "auxiliar": "Auxiliar Seed",
+    "respMariri": "Responsável Seed",
+    "respChacrona": "Responsável Seed",
+    "respChacrona2": "",
+    "mariri": "Tucunacá",
+    "maririKg": 60,
+    "chacrona": [
+      {
+        "nucleo": "Caupuri",
+        "kg": 6.5
+      }
+    ],
+    "obsGeral": "[SEED] Preparo de domingo em andamento, dados fictícios para teste.",
+    "blocos": [
+      {
+        "obs": "",
+        "panelas": [
+          {
+            "numero": 1,
+            "tipo": "1ª vez",
+            "entrada": "06:15",
+            "fervura": "06:50",
+            "colhida": "",
+            "litros": null,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.5,
+            "pesoCheiaKg": 38
+          },
+          {
+            "numero": 2,
+            "tipo": "1ª vez",
+            "entrada": "06:20",
+            "fervura": "06:55",
+            "colhida": "",
+            "litros": null,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.5,
+            "pesoCheiaKg": 38
+          },
+          {
+            "numero": 3,
+            "tipo": "2ª vez",
+            "entrada": "06:40",
+            "fervura": "07:10",
+            "colhida": "",
+            "litros": null,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.5,
+            "pesoCheiaKg": 38
+          },
+          {
+            "numero": 4,
+            "tipo": "2ª vez",
+            "entrada": "07:55",
+            "fervura": "",
+            "colhida": "",
+            "litros": null,
+            "metaLitros": 10.15,
+            "pesoSecaKg": 12.5,
+            "pesoCheiaKg": 38
+          }
+        ]
+      }
+    ]
+  }
+]

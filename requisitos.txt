@@ -1,0 +1,188 @@
+Preparo de Vegetal v2 — Descrição e requisitos
+22 de nov. de 2026 · @ALEXANDRE ARAÚJO ROCHA
+Visão geral
+O Preparo de Vegetal é um aplicativo web, pensado para o celular, que substitui a ficha em papel do preparo do núcleo: ele registra mariri, chacrona, panelas, horários e litros colhidos, e mostra o andamento de cada panela. Inclui também uma calculadora que multiplica um valor decimal por π.
+Quem usa: mestre, auxiliar e responsáveis do preparo, muitas vezes de pé, com as mãos ocupadas e à noite. Por isso a versão 2 prioriza toques grandes, horário marcado com um toque, estado da panela legível de longe e menu fixo no rodapé.
+O problema que resolve: a ficha em papel tem rasuras, horários difíceis de ler e nenhuma soma automática. O app deixa os dados limpos, calcula os totais e avisa quando falta uma informação.
+Versões e distribuição
+Existem três entregas. A versão 2 é a de uso no celular e a base do pacote instalável (PWA).
+Entrega
+Onde
+O que traz
+Versão 1
+Link da v1
+Menu em abas no topo. Tem tipo APURO, totais de litros por tipo e unificação das variações de tipo.
+Versão 2
+Link da v2
+Menu no rodapé com ícones, panelas em cartões, botão Agora nos horários e interface pensada para o celular.
+Pacote PWA
+Arquivo preparo-vegetal-pwa.zip
+A mesma interface da v2, com manifesto, service worker e ícones, para instalar na tela inicial e usar sem internet.
+Cada entrega guarda os dados separadamente no navegador. Para levar registros de uma para outra, usa-se Resgatar dados e Importar (ver Dados e persistência).
+Requisitos funcionais
+O app tem cinco telas, acessadas pelo menu do rodapé: Cabeçalho, Panelas, Andamento, Registros e Calc. π.
+Cabeçalho
+• RF-01 Registrar os dados do preparo: núcleo (padrão "Bendito Filho"), data (padrão: hoje), mestre do preparo, auxiliar, responsável pelo mariri e responsáveis pela chacrona (1º e 2º).
+• RF-02 Registrar o mariri: procedência e quantidade em Kg.
+• RF-03 Registrar a chacrona por núcleo de origem (nome e Kg), começando com duas linhas, com adicionar e remover linha, e mostrar o total de chacrona somado automaticamente.
+• RF-04 Registrar observações gerais do preparo.
+Panelas
+• RF-05 Organizar as panelas em blocos de 5. O usuário adiciona quantos blocos precisar e remove um bloco com confirmação por segundo toque.
+• RF-06 Para cada panela, registrar o tipo (1ª vez, 2ª vez, 3ª vez ou Água), os horários de entrada, fervura e colhida, e os litros.
+• RF-07 Oferecer, ao lado de cada horário, o botão Agora, que preenche o horário atual quando o campo está vazio.
+• RF-08 Travar o valor dos litros ao sair do campo. O botão Editar libera o campo para correção. Aceitar vírgula ou ponto e recusar texto que não seja número.
+• RF-09 Colorir a borda do cartão de cada panela conforme o estado (ver Regras de negócio).
+• RF-10 Registrar observações de cada bloco e mostrar, por bloco, o total de litros e uma estimativa de tempo e litros.
+• RF-11 Mostrar o total geral colhido, com os botões Salvar registro e Novo preparo. Novo preparo pede confirmação antes de descartar o que está na tela.
+Andamento
+• RF-12 Mostrar um resumo com o número de panelas no fogo, colhidas e com pendências, e um filtro para ver só as que estão no fogo.
+• RF-13 Mostrar um cartão por panela com bloco, número, tipo, estado, horários, litros e tempo (em andamento ou total).
+• RF-14 Apontar informação faltando em vermelho e itens a conferir em amarelo (regras em Regras de negócio).
+• RF-15 Permitir lembretes com texto e horário opcional, marcar como feito e excluir. Lembrete com horário já passado e não feito fica em vermelho.
+• RF-16 Permitir ajustar os avisos automáticos: minutos sem fervura (padrão 30) e horas sem colheita (padrão 5).
+• RF-17 Atualizar a tela a cada 30 segundos e mostrar no menu, sobre o ícone de chama, quantas panelas estão no fogo.
+• RF-18 Calcular o andamento a partir do que está preenchido na tela Panelas, mesmo sem salvar.
+Registros
+• RF-19 Listar os registros salvos, do mais recente para o mais antigo, com data, núcleo, mestre, mariri (Kg), chacrona (Kg) e total de litros. O menu mostra a contagem.
+• RF-20 Abrir um registro para editar e excluir com confirmação por segundo toque.
+• RF-21 Salvar o registro atual pelo botão Salvar, no topo (Cabeçalho e Panelas) ou no fim da tela Panelas. Sem data, o app leva o usuário ao Cabeçalho.
+• RF-22 Exportar todos os registros em CSV e em JSON.
+• RF-23 Importar JSON escolhendo um arquivo ou colando o texto, sem duplicar registros que já existem.
+• RF-24 Resgatar dados: copiar o JSON de todos os registros e mostrá-lo numa caixa de texto.
+• RF-25 No pacote PWA, mostrar o cartão Instalar app (no iPhone, a instrução de Adicionar à Tela de Início).
+Calculadora π
+• RF-26 Receber um valor decimal, com vírgula ou ponto, e mostrar o resultado da multiplicação por π enquanto o usuário digita.
+• RF-27 Permitir escolher 2, 4, 6, 10 ou 15 casas decimais (padrão 4) e copiar o resultado.
+• RF-28 Avisar quando o valor digitado não for um número.
+Regras de negócio e cálculos
+O estado de cada panela vem só dos horários preenchidos.
+Estado
+Condição
+Cor
+Sem entrada
+Há algum dado, mas não há horário de entrada
+Cinza
+No fogo
+Entrada preenchida, sem fervura e sem colhida
+Verde
+Fervendo
+Entrada e fervura preenchidas, sem colhida
+Amarelo
+Colhida
+Horário de colhida preenchido
+Vermelho
+Cálculos
+• Total do bloco = soma dos litros das panelas do bloco. Total geral = soma dos blocos.
+• Tempo total da panela = colhida menos entrada. Se a colhida for menor que a entrada, soma 24 horas (virou a meia-noite).
+• Estimativa do bloco: tempo médio por panela; duração do bloco = última colhida menos primeira entrada; L/h = litros dividido pela duração em horas; min/L = duração em minutos dividida pelos litros. O L/h só aparece com litros informados e duração maior que zero.
+• No fogo há = hora atual menos entrada. Só calcula quando a data do Cabeçalho é hoje e ignora valores acima de 16 horas.
+• Números em formato pt-BR, com até 2 casas decimais nos totais.
+Informação faltando (vermelho)
+• Panela sem tipo.
+• Fervura, colhida ou litros preenchidos sem a entrada.
+• Colhida ou litros preenchidos sem a fervura.
+• Litros preenchidos sem o horário de colheita.
+• Panela colhida sem litros.
+Conferir (amarelo)
+• Sem fervura depois de X minutos da entrada (padrão 30).
+• Sem colheita depois de Y horas da entrada (padrão 5).
+• Esses limites são provisórios e ajustáveis na tela Andamento.
+Travamento de litros
+• Ao sair do campo com um número válido, o valor trava. Só o botão Editar libera, e o campo trava de novo ao sair.
+• Registros salvos abrem com os litros já travados.
+Requisitos de usabilidade e interface
+• RU-01 Menu fixo no rodapé com cinco itens e ícones do tema: folha de chacrona (Cabeçalho), panela com vapor (Panelas), chama (Andamento), caderno (Registros) e π (Calc. π). O item ativo fica destacado.
+• RU-02 Barra superior fixa com o título da tela, o resumo "Preparo de data · Mestre" e o botão Salvar nas telas de Cabeçalho e Panelas.
+• RU-03 Uso com uma mão no celular em pé: campos e botões principais com pelo menos 46 px de altura e texto de 16 px nos campos, para o celular não dar zoom ao digitar.
+• RU-04 Cada panela é um cartão, sem tabela com rolagem lateral. Os campos ficam em duas colunas e o botão Agora fica junto do rótulo de cada horário.
+• RU-05 O estado da panela aparece por cor (e, na tela Andamento, também por texto): verde No fogo, amarelo Fervendo, vermelho Colhida.
+• RU-06 Ações que apagam dados pedem um segundo toque: remover bloco, excluir registro e iniciar novo preparo. A confirmação expira em 3 segundos.
+• RU-07 Mensagens curtas, em português, com verbo e na mesma palavra do botão (Salvar registro, "Registro salvo"). Mensagens de erro dizem o que fazer.
+• RU-08 Estados vazios explicam o próximo passo, por exemplo "Nenhum registro salvo. Preencha o Cabeçalho e as Panelas e toque em Salvar".
+• RU-09 Acessibilidade: rótulos em todos os campos, nomes acessíveis nos botões de ícone, foco visível por teclado, tema claro e escuro automáticos e respeito à preferência de menos movimento.
+• RU-10 Respeitar as áreas seguras da tela (entalhe e barra inferior) e lembrar a última tela aberta.
+Dados e persistência
+Todos os dados ficam no aparelho, no armazenamento local do navegador. Nada é enviado a um servidor.
+Formato do registro (JSON)
+Campo
+Conteúdo
+id, salvoEm
+Identificador do registro e data e hora em que foi salvo
+nucleo, data, mestre, auxiliar
+Dados do cabeçalho
+respMariri, respChacrona, respChacrona2
+Responsáveis
+mariri, maririKg
+Procedência e Kg do mariri
+chacrona
+Lista de itens com nucleo e kg
+obsGeral
+Observações gerais
+blocos
+Lista de blocos; cada um tem obs e panelas (tipo, entrada, fervura, colhida, litros)
+Regras
+• RD-01 Os registros ficam em chaves próprias do armazenamento local: registros, excluídos, lembretes, avisos e última tela.
+• RD-02 Registros podem vir embutidos no código, no array DADOS_INICIAIS. Eles aparecem para quem abrir o app e se juntam aos salvos no navegador pelo id. Excluir um deles o oculta só naquele navegador.
+• RD-03 Exportar CSV: separador ponto e vírgula, com marca de codificação para abrir no Excel, uma linha por panela, com data, núcleo, responsáveis, mariri, chacrona, bloco, número e tipo da panela, horários, litros e observações.
+• RD-04 Exportar JSON: todos os registros, em arquivo e em caixa de texto.
+• RD-05 Importar aceita uma lista de registros, um registro único ou um objeto com a chave registros. Cada registro precisa ter blocos. Registros com id já existente são contados como já existentes e não duplicam.
+• RD-06 Resgatar dados copia o JSON para a área de transferência e o mostra numa caixa de texto, para o caso de a cópia ser bloqueada.
+• RD-07 Cada origem (v1, v2, PWA hospedado) tem armazenamento separado. Migrar dados é resgatar numa e importar na outra.
+PWA
+O pacote PWA tem a mesma interface da v2. A página dentro do claude.ai não pode ser instalada nem funciona offline, então a instalação depende de hospedar o pacote com HTTPS.
+• RP-01 Manifesto com nome "Preparo de Vegetal", nome curto "Preparo", abertura em tela cheia (standalone), orientação retrato, início em ./, cor de fundo #edf1ea e cor do tema #1f5c42.
+• RP-02 Ícones PNG de 192 e 512 px e um ícone adaptável de 512 px (panela com vapor sobre verde mata).
+• RP-03 Service worker que guarda o app no aparelho, serve do cache e atualiza em segundo plano. Depois da primeira abertura, o app funciona sem internet. Para forçar atualização geral, troca-se o número de versão do cache (preparo-v2).
+• RP-04 Instalação no Android (Chrome): botão Instalar app na tela Registros. No iPhone (Safari): Compartilhar e depois Adicionar à Tela de Início, com a instrução mostrada no app.
+• RP-05 Em modo instalado, o cartão de instalação não aparece.
+• RP-06 Os downloads (CSV e JSON) usam o download normal do navegador no PWA.
+• RP-07 Hospedagem sugerida: Netlify Drop ou GitHub Pages, arrastando ou enviando a pasta do pacote. O LEIA-ME do pacote traz os passos.
+Requisitos não funcionais e limitações
+Requisitos
+• RN-01 Desempenho: um único arquivo HTML de cerca de 36 KB, sem bibliotecas externas, que abre rápido em celulares simples.
+• RN-02 Privacidade: os dados ficam só no aparelho; o app não envia nada a servidor.
+• RN-03 Compatibilidade: navegadores atuais, celular em pé (retrato), a partir de telas de 360 px de largura, e também computador.
+• RN-04 Idioma e formato: português do Brasil, números com vírgula decimal e horários de 24 horas no celular.
+Limitações conhecidas
+• Não há sincronização entre aparelhos nem login. Cada pessoa vê só o que cadastrou, mais o que vier no código.
+• Limpar os dados do navegador apaga os registros. Por isso existem exportar e resgatar.
+• Os avisos só aparecem com o app aberto. Não há alarme nem notificação com a tela fechada.
+• A precisão de π na calculadora é de cerca de 15 dígitos.
+• As estimativas supõem o preparo no mesmo dia (aceitam virada de meia-noite) e panelas em paralelo.
+• Os limites de alerta (30 min e 5 h) são provisórios e não foram validados com o núcleo.
+• Testes: a v2 foi testada em Chrome com tela de celular simulada (390 px) e não em aparelhos reais nem em iPhone.
+Pendências
+A v2 ainda não tem três recursos que a v1 já recebeu: o tipo APURO, os totais de litros por tipo e a unificação das variações de tipo.
+Recurso
+Versão 1
+Versão 2
+Tipo APURO e categorias fixas (1ª, 2ª, 3ª vez, APURO)
+Sim
+Não (só 1ª, 2ª, 3ª vez e Água)
+Total de litros por tipo de panela
+Sim, na tela Panelas e na lista de registros
+Não
+Unificação de variações do tipo (por exemplo "1" e "2ª")
+Sim
+Não (o tipo é uma lista fechada)
+Travar litros e botão Editar
+Sim
+Sim
+Andamento e lembretes
+Sim
+Sim
+Exportar JSON e importar colando o texto
+Sim
+Sim
+Menu no rodapé com ícones e panelas em cartões
+Não
+Sim
+Pacote PWA instalável
+Não
+Sim
+Próximos passos sugeridos
+[ ] Levar APURO, totais por tipo e unificação de tipos para a v2
+[ ] Hospedar o pacote PWA com HTTPS e testar em celular real, Android e iPhone
+[ ] Resgatar os registros reais, incluindo o preparo de 20/03/2026, e colocar no array DADOS_INICIAIS
+[ ] Validar com o núcleo os limites dos avisos (30 min sem fervura e 5 h sem colheita)
+[ ] Avaliar um banco compartilhado se várias pessoas precisarem ver os mesmos registros

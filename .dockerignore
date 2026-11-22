@@ -1,0 +1,14 @@
+.git
+.pnpm-store
+graft
+**/node_modules
+**/__pycache__
+**/*.egg-info
+**/.pytest_cache
+backend/.venv
+backend/data
+backend/seeds
+backend/tests
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+requisitos.txt
