@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from ..database import db_session, get_config_map, update_config_map
-from ..preparos import preparo_atual
+from ..preparos import preparo_atual, preparo_editavel
 from ..schemas import ConfigUpdate
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -20,6 +20,6 @@ def read_config(preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, A
 
 
 @router.put("")
-def write_config(body: ConfigUpdate, preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, Any]:
+def write_config(body: ConfigUpdate, preparo: dict[str, Any] = Depends(preparo_editavel)) -> dict[str, Any]:
     with db_session() as conn:
         return update_config_map(conn, preparo["id"], body.model_dump(exclude_none=True))

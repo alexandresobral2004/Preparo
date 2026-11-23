@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS preparo_membros (
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     papel TEXT NOT NULL CHECK (papel IN ('dono', 'membro')),
     situacao TEXT NOT NULL CHECK (situacao IN ('pendente', 'aprovado', 'recusado')),
+    permissao TEXT NOT NULL DEFAULT 'editar' CHECK (permissao IN ('editar', 'acompanhar')),
     created_at TEXT NOT NULL,
     PRIMARY KEY (preparo_id, usuario_id)
 );
@@ -193,6 +194,9 @@ _COLUNAS_NOVAS: dict[str, list[tuple[str, str]]] = {
         ("atualizado_por_nome", "TEXT NOT NULL DEFAULT ''"),
     ],
     "lembretes": [("preparo_id", "TEXT")],
+    "preparo_membros": [
+        ("permissao", "TEXT NOT NULL DEFAULT 'editar' CHECK (permissao IN ('editar', 'acompanhar'))")
+    ],
     "panelas": [("peso_com_agua_kg", "REAL")],
     "usuarios": [("grau", "TEXT NOT NULL DEFAULT ''"), ("nucleo", "TEXT NOT NULL DEFAULT ''"), ("email", "TEXT")],
 }

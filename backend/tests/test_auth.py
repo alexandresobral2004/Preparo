@@ -446,7 +446,8 @@ def _membro_aprovado(admin: TestClient, pid: str, login: str) -> int:
     with TestClient(admin.app) as membro:
         _login(membro, login, f"{login}-senha-1")
         assert membro.post(f"/api/preparos/{pid}/solicitar").status_code == 200
-    assert admin.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado"}).status_code == 200
+    body = {"situacao": "aprovado", "permissao": "editar"}
+    assert admin.patch(f"/api/preparos/{pid}/membros/{uid}", json=body).status_code == 200
     return uid
 
 

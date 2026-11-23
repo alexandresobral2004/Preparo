@@ -1,4 +1,4 @@
-import type { MembroPreparo, PreparoResumo, Usuario } from "../types";
+import type { MembroPreparo, PermissaoMembro, PreparoResumo, Usuario } from "../types";
 import { apiFetch, LS_KEYS } from "./client";
 
 // 401 no login/me é resposta normal (senha errada / sem sessão), não "sessão expirada".
@@ -73,13 +73,15 @@ export const listarPreparos = () => apiFetch<PreparoResumo[]>("/api/preparos");
 export const criarPreparo = (nome: string) => apiFetch<{ id: string; nome: string }>("/api/preparos", post({ nome }));
 export const solicitarEntrada = (id: string) => apiFetch<{ situacao: string }>(`/api/preparos/${id}/solicitar`, post({}));
 export const listarMembros = (id: string) => apiFetch<MembroPreparo[]>(`/api/preparos/${id}/membros`);
-export const adicionarMembro = (preparoId: string, email: string) =>
-  apiFetch<{ usuarioId: number; nome: string; papel: string; situacao: "aprovado" }>(
+export const adicionarMembro = (preparoId: string, email: string, permissao: PermissaoMembro) =>
+  apiFetch<{ usuarioId: number; nome: string; papel: string; situacao: "aprovado"; permissao: PermissaoMembro }>(
     `/api/preparos/${preparoId}/membros`,
-    post({ email })
+    post({ email, permissao })
   );
-export const decidirMembro = (preparoId: string, usuarioId: number, situacao: "aprovado" | "recusado") =>
-  apiFetch<{ situacao: string }>(`/api/preparos/${preparoId}/membros/${usuarioId}`, patch({ situacao }));
+/** Aprovar exige a permissão; recusar não tem permissão (o servidor ignora). */
+export type DecisaoMembro = { situacao: "aprovado"; permissao: PermissaoMembro } | { situacao: "recusado" };
+export const decidirMembro = (preparoId: string, usuarioId: number, decisao: DecisaoMembro) =>
+  apiFetch<{ situacao: string }>(`/api/preparos/${preparoId}/membros/${usuarioId}`, patch(decisao));
 
 const CHAVES_DE_DADOS = [LS_KEYS.draft, LS_KEYS.registros, LS_KEYS.lembretes, LS_KEYS.config] as const;
 

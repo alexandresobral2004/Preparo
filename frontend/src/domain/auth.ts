@@ -1,6 +1,11 @@
-import type { BlocoAutoria, PreparoDraft, Usuario } from "../types";
+import type { BlocoAutoria, PreparoDraft, PreparoResumo, Usuario } from "../types";
 
 export const SENHA_MIN = 8;
+
+/** Quem só acompanha vê o preparo em somente leitura; o servidor também barra as escritas. */
+export function podeEditar(preparo: Pick<PreparoResumo, "minhaPermissao">): boolean {
+  return preparo.minhaPermissao === "editar";
+}
 
 export const GRAUS = [
   { valor: "socio", rotulo: "Quadro de Sócios" },

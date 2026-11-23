@@ -24,6 +24,8 @@ interface PanelasViewProps {
   /** Nome de quem está logado: já vem preenchido em "Quem está anotando" nos blocos novos. */
   anotadorPadrao: string;
   saving: boolean;
+  /** Acompanhante: os campos e os botões de bloco ficam desabilitados e o Salvar some. */
+  somenteLeitura?: boolean;
 }
 
 function renumberBlocos(blocos: BlocoDraft[]): BlocoDraft[] {
@@ -43,6 +45,7 @@ export const PanelasView: React.FC<PanelasViewProps> = ({
   onSave,
   anotadorPadrao,
   saving,
+  somenteLeitura = false,
 }) => {
   const totais = calcularTotaisPorTipo(draft.blocos);
 
@@ -75,7 +78,7 @@ export const PanelasView: React.FC<PanelasViewProps> = ({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <fieldset disabled={somenteLeitura} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
       {draft.blocos.map((bloco, bIdx) => {
         const met = calcularMetricasBloco(bloco);
         const predBloco = prediction?.blocos?.[bIdx];
@@ -201,17 +204,19 @@ export const PanelasView: React.FC<PanelasViewProps> = ({
           ))}
         </div>
 
-        <div className="row-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onSave}
-            disabled={saving}
-          >
-            {saving ? "Salvando..." : "Salvar registro"}
-          </button>
-        </div>
+        {!somenteLeitura && (
+          <div className="row-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onSave}
+              disabled={saving}
+            >
+              {saving ? "Salvando..." : "Salvar registro"}
+            </button>
+          </div>
+        )}
       </section>
-    </div>
+    </fieldset>
   );
 };

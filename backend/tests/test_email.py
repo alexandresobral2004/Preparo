@@ -288,8 +288,37 @@ def _equipe_por_email(monkeypatch, tmp_path: Path):
     return app, admin, maria, joao, pid
 
 
-def _adicionar(cliente: TestClient, pid: str, email: str):
-    return cliente.post(f"/api/preparos/{pid}/membros", json={"email": email})
+def _adicionar(cliente: TestClient, pid: str, email: str, permissao: str = "editar"):
+    return cliente.post(f"/api/preparos/{pid}/membros", json={"email": email, "permissao": permissao})
+
+
+def test_adicionar_sem_permissao_da_422_e_a_pessoa_nao_entra(monkeypatch, tmp_path: Path) -> None:
+    _, _, maria, joao, pid = _equipe_por_email(monkeypatch, tmp_path)
+    assert maria.post(f"/api/preparos/{pid}/membros", json={"email": "joao@x.com"}).status_code == 422
+    assert joao.get("/api/registros", headers={HDR: pid}).status_code == 403
+
+
+def test_adicionar_grava_a_permissao_escolhida_e_devolve_na_resposta(monkeypatch, tmp_path: Path) -> None:
+    _, _, maria, joao, pid = _equipe_por_email(monkeypatch, tmp_path)
+    res = _adicionar(maria, pid, "joao@x.com", "acompanhar")
+    assert res.status_code == 200
+    assert res.json()["permissao"] == "acompanhar"
+    assert joao.get("/api/registros", headers={HDR: pid}).status_code == 200  # acompanhar também lê
+
+
+def test_readicionar_quem_ja_esta_aprovado_atualiza_a_permissao(monkeypatch, tmp_path: Path) -> None:
+    _, _, maria, joao, pid = _equipe_por_email(monkeypatch, tmp_path)
+    _adicionar(maria, pid, "joao@x.com", "editar")
+    res = _adicionar(maria, pid, "joao@x.com", "acompanhar")
+    assert res.status_code == 200 and res.json()["permissao"] == "acompanhar"
+    assert next(p for p in joao.get("/api/preparos").json() if p["id"] == pid)["minhaPermissao"] == "acompanhar"
+
+
+def test_adicionar_o_proprio_dono_com_acompanhar_nao_rebaixa_o_dono(monkeypatch, tmp_path: Path) -> None:
+    _, _, maria, _, pid = _equipe_por_email(monkeypatch, tmp_path)
+    res = _adicionar(maria, pid, "maria@x.com", "acompanhar")
+    assert res.json()["permissao"] == "editar"
+    assert next(p for p in maria.get("/api/preparos").json() if p["id"] == pid)["minhaPermissao"] == "editar"
 
 
 def test_dono_adiciona_pessoa_ativa_e_ela_atualiza_rascunho_e_registros(monkeypatch, tmp_path: Path) -> None:

@@ -228,12 +228,17 @@ export interface Usuario {
   nucleo: string;
 }
 
+/** 'editar' escreve no preparo; 'acompanhar' só lê. Quem autoriza é o dono do preparo. */
+export type PermissaoMembro = "editar" | "acompanhar";
+
 export interface PreparoResumo {
   id: string;
   nome: string;
   donoNome: string;
   meuPapel: "dono" | "membro" | null;
   minhaSituacao: "aprovado" | "pendente" | "recusado" | null;
+  /** 'editar' para o dono e para quem recebeu essa permissão; null se não está aprovado. */
+  minhaPermissao: PermissaoMembro | null;
   pendentes: number;
 }
 
@@ -244,4 +249,5 @@ export interface MembroPreparo {
   email: string | null;
   papel: "dono" | "membro";
   situacao: "aprovado" | "pendente" | "recusado";
+  permissao: "editar" | "acompanhar";
 }

@@ -47,7 +47,7 @@ import { RegistrosView } from "./views/RegistrosView";
 import { CalcPiView } from "./views/CalcPiView";
 import { ContaView } from "./views/ContaView";
 import { UsuariosView } from "./views/UsuariosView";
-import { mesclarRespostaDoRascunho } from "./domain/auth";
+import { mesclarRespostaDoRascunho, podeEditar } from "./domain/auth";
 
 const VALID_TABS: TabKey[] = ["cabecalho", "panelas", "andamento", "registros", "calc", "conta", "usuarios"];
 
@@ -106,6 +106,8 @@ export const App: React.FC<AppProps> = ({
   onSair,
 }) => {
   const ehAdmin = usuario.papel === "admin";
+  // Acompanhante: vê o preparo em somente leitura e não grava rascunho nem no aparelho nem no servidor.
+  const somenteLeitura = !podeEditar(preparo);
   // Usuários é só do admin: se a última aba salva era essa e quem entra não é admin, abre a Conta.
   const [tab, setTab] = useState<TabKey>(() => {
     const salva = getInitialTab();
@@ -115,7 +117,10 @@ export const App: React.FC<AppProps> = ({
   const [online, setOnline] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
-  const [draft, setDraft] = useState<PreparoDraft>(() => loadLocalDraftFallback(usuario.nome));
+  // Acompanhante nunca usa o rascunho local (pode ser de outro preparo): começa vazio e recebe o do servidor.
+  const [draft, setDraft] = useState<PreparoDraft>(() =>
+    somenteLeitura ? createEmptyPreparo(usuario.nome) : loadLocalDraftFallback(usuario.nome)
+  );
   const [registros, setRegistros] = useState<RegistroSaved[]>(loadCachedRegistros);
   const [lembretes, setLembretes] = useState<LembreteItem[]>([]);
   const [config, setConfig] = useState<ConfigAvisos>({
@@ -222,7 +227,7 @@ export const App: React.FC<AppProps> = ({
 
   // Auto-save do rascunho no SQLite + atualização de predições estatísticas
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || somenteLeitura) return;
     try {
       localStorage.setItem(LS_KEYS.draft, JSON.stringify(draft));
     } catch {
@@ -256,12 +261,23 @@ export const App: React.FC<AppProps> = ({
             return;
           }
           marcar("erro");
-          setOnline(false);
+          if (err instanceof TypeError) {
+            setOnline(false); // fetch falhou: sem rede
+          } else {
+            notify(err instanceof Error ? err.message : "Erro ao salvar rascunho.", "error");
+          }
         });
       void refreshPrediction(draft, config.metaLitrosPadrao);
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [draft, config.metaLitrosPadrao, hydrated, refreshPrediction, notify]);
+  }, [draft, config.metaLitrosPadrao, hydrated, somenteLeitura, refreshPrediction, notify]);
+
+  // Acompanhante: sem salvar, mas a predição continua acompanhando o que chega do servidor.
+  useEffect(() => {
+    if (!hydrated || !somenteLeitura) return;
+    const timer = window.setTimeout(() => void refreshPrediction(draft, config.metaLitrosPadrao), 400);
+    return () => window.clearTimeout(timer);
+  }, [draft, config.metaLitrosPadrao, hydrated, somenteLeitura, refreshPrediction]);
 
   // Traz o que os outros participantes digitaram (só quando não há edição minha pendente)
   useEffect(() => {
@@ -357,7 +373,7 @@ export const App: React.FC<AppProps> = ({
   const handleOpenRegistro = (reg: RegistroSaved) => {
     setDraft({ ...draftFromSavedRegistro(reg), _versao: draftRef.current._versao });
     setTab("panelas");
-    notify("Registro aberto para edição");
+    notify(somenteLeitura ? "Registro aberto" : "Registro aberto para edição");
   };
 
   const handleDeleteRegistro = async (id: string) => {
@@ -466,6 +482,7 @@ export const App: React.FC<AppProps> = ({
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onSave={handleSaveRegistro}
         saving={saving}
+        somenteLeitura={somenteLeitura}
         statusSalvamento={statusSalvamento}
         onSair={() => {
           if (
@@ -479,12 +496,19 @@ export const App: React.FC<AppProps> = ({
       />
 
       <main className="app-main">
+        {somenteLeitura && (
+          <p className="alert-box alert-warn" role="status">
+            Você participa como acompanhante: pode ver e exportar, mas não alterar.
+          </p>
+        )}
+
         {tab === "cabecalho" && (
           <CabecalhoView
             draft={draft}
             onChange={setDraft}
             dataInputRef={dataInputRef}
             pesosSugestoes={pesosSugestoes}
+            somenteLeitura={somenteLeitura}
           />
         )}
 
@@ -496,6 +520,7 @@ export const App: React.FC<AppProps> = ({
             onSave={handleSaveRegistro}
             anotadorPadrao={usuario.nome}
             saving={saving}
+            somenteLeitura={somenteLeitura}
           />
         )}
 
@@ -510,6 +535,7 @@ export const App: React.FC<AppProps> = ({
             onToggleLembrete={handleToggleLembrete}
             onDeleteLembrete={handleDeleteLembrete}
             onGoToPanelas={() => setTab("panelas")}
+            somenteLeitura={somenteLeitura}
           />
         )}
 
@@ -520,6 +546,7 @@ export const App: React.FC<AppProps> = ({
             onDeleteRegistro={handleDeleteRegistro}
             onImportJson={handleImportJson}
             onRescueJson={handleRescueJson}
+            somenteLeitura={somenteLeitura}
           />
         )}
 

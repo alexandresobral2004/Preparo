@@ -1,8 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { adicionarMembro, decidirMembro, editarPerfil, listarMembros, trocarSenha } from "../api/auth";
 import { ConfirmButton } from "../components/ConfirmButton";
-import { GRAUS, normalizarEmail, validarEmail, validarNovaSenha } from "../domain/auth";
-import type { MembroPreparo, PreparoResumo, Usuario } from "../types";
+import { GRAUS, normalizarEmail, podeEditar, validarEmail, validarNovaSenha } from "../domain/auth";
+import type { MembroPreparo, PermissaoMembro, PreparoResumo, Usuario } from "../types";
+
+const ROTULO_PERMISSAO: Record<PermissaoMembro, string> = {
+  editar: "pode editar",
+  acompanhar: "só acompanha",
+};
 
 interface ContaViewProps {
   usuario: Usuario;
@@ -39,6 +44,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [membros, setMembros] = useState<MembroPreparo[]>([]);
   const [erroMembros, setErroMembros] = useState("");
   const [emailParticipante, setEmailParticipante] = useState("");
+  // Sem valor pré-marcado: o dono precisa escolher de propósito.
+  const [permissaoParticipante, setPermissaoParticipante] = useState<PermissaoMembro | "">("");
   const [enviandoParticipante, setEnviandoParticipante] = useState(false);
 
   const ehDono = preparo.meuPapel === "dono";
@@ -117,10 +124,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
     setErroMembros("");
     const problema = validarEmail(emailParticipante);
     if (problema) return setErroMembros(problema);
+    if (!permissaoParticipante) return setErroMembros("Escolha se a pessoa pode editar ou só acompanhar.");
     setEnviandoParticipante(true);
     try {
-      const adicionado = await adicionarMembro(preparo.id, normalizarEmail(emailParticipante));
+      const adicionado = await adicionarMembro(preparo.id, normalizarEmail(emailParticipante), permissaoParticipante);
       setEmailParticipante("");
+      setPermissaoParticipante("");
       onNotify(`${adicionado.nome} agora participa deste preparo.`, "info");
       await carregar();
     } catch (err) {
@@ -144,7 +153,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <ConfirmButton label="Novo preparo" confirmLabel="Toque para zerar o rascunho" onConfirm={onNovoPreparo} />
+          {podeEditar(preparo) && (
+            <ConfirmButton label="Novo preparo" confirmLabel="Toque para zerar o rascunho" onConfirm={onNovoPreparo} />
+          )}
           <button type="button" className="btn" onClick={onTrocarPreparo}>Trocar de preparo</button>
           <button type="button" className="btn" onClick={onSair}>Sair</button>
         </div>
@@ -223,8 +234,22 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 required
               />
             </div>
+            <div className="field">
+              <label className="field-label" htmlFor="participante-permissao">Pode</label>
+              <select
+                id="participante-permissao"
+                className="input"
+                value={permissaoParticipante}
+                onChange={(e) => setPermissaoParticipante(e.target.value as PermissaoMembro | "")}
+                required
+              >
+                <option value="" disabled>Escolha</option>
+                <option value="editar">Editar o preparo</option>
+                <option value="acompanhar">Só acompanhar (somente leitura)</option>
+              </select>
+            </div>
             {erroMembros && <div id="membros-erro" className="alert-box alert-danger" role="alert">{erroMembros}</div>}
-            <button type="submit" className="btn btn-primary" disabled={enviandoParticipante || !emailParticipante.trim()}>
+            <button type="submit" className="btn btn-primary" disabled={enviandoParticipante || !emailParticipante.trim() || !permissaoParticipante}>
               Adicionar participante
             </button>
           </form>
@@ -232,15 +257,36 @@ export const ContaView: React.FC<ContaViewProps> = ({
           {membros.map((m) => (
             <div key={m.usuarioId} className="list-row static">
               <span>
-                <strong>{m.nome}</strong> <span className="muted">· {m.email ?? m.login} · {m.papel === "dono" ? "dono" : m.situacao}</span>
+                <strong>{m.nome}</strong> <span className="muted">· {m.email ?? m.login} · {m.papel === "dono" ? "dono" : m.situacao}{m.situacao === "aprovado" && m.papel !== "dono" ? ` · ${ROTULO_PERMISSAO[m.permissao]}` : ""}</span>
               </span>
+              {m.papel !== "dono" && m.situacao === "aprovado" && (
+                <select
+                  className="input"
+                  aria-label={`Permissão de ${m.nome}`}
+                  value={m.permissao}
+                  onChange={(e) =>
+                    agir(
+                      () => decidirMembro(preparo.id, m.usuarioId, { situacao: "aprovado", permissao: e.target.value as PermissaoMembro }),
+                      `Permissão de ${m.nome} atualizada.`
+                    )
+                  }
+                >
+                  <option value="editar">Pode editar</option>
+                  <option value="acompanhar">Só acompanhar</option>
+                </select>
+              )}
               {m.papel !== "dono" && m.situacao !== "aprovado" && (
-                <button type="button" className="btn btn-primary" aria-label={`Aprovar ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "aprovado"), `${m.nome} aprovado(a).`)}>
-                  Aprovar
-                </button>
+                <>
+                  <button type="button" className="btn btn-primary" aria-label={`Aprovar ${m.nome} para editar`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, { situacao: "aprovado", permissao: "editar" }), `${m.nome} aprovado(a) para editar.`)}>
+                    Aprovar para editar
+                  </button>
+                  <button type="button" className="btn" aria-label={`Aprovar ${m.nome} para acompanhar`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, { situacao: "aprovado", permissao: "acompanhar" }), `${m.nome} aprovado(a) para acompanhar.`)}>
+                    Aprovar para acompanhar
+                  </button>
+                </>
               )}
               {m.papel !== "dono" && m.situacao !== "recusado" && (
-                <button type="button" className="btn" aria-label={`${m.situacao === "aprovado" ? "Remover" : "Recusar"} ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "recusado"), `${m.nome} removido(a).`)}>
+                <button type="button" className="btn" aria-label={`${m.situacao === "aprovado" ? "Remover" : "Recusar"} ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, { situacao: "recusado" }), `${m.nome} removido(a).`)}>
                   {m.situacao === "aprovado" ? "Remover" : "Recusar"}
                 </button>
               )}

@@ -22,6 +22,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   onSave: () => void;
   saving: boolean;
+  somenteLeitura: boolean;
 }
 
 const TITLES: Record<TabKey, string> = {
@@ -45,8 +46,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   saving,
   statusSalvamento,
   onSair,
+  somenteLeitura,
 }) => {
-  const showSave = tab === "cabecalho" || tab === "panelas";
+  const showSave = (tab === "cabecalho" || tab === "panelas") && !somenteLeitura;
   const subtitle = `Preparo de ${formatDateBr(dataPreparo)}${mestre.trim() ? ` · ${mestre.trim()}` : ""}`;
 
   return (

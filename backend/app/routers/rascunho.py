@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from ..database import ConflitoRascunho, clear_rascunho, db_session, get_rascunho, save_rascunho
-from ..preparos import preparo_atual
+from ..preparos import preparo_atual, preparo_editavel
 
 router = APIRouter(prefix="/api/rascunho", tags=["rascunho"])
 
@@ -20,7 +20,7 @@ def read_rascunho(preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str,
 
 
 @router.put("", response_model=None)
-def upsert_rascunho(payload: dict[str, Any], preparo: dict[str, Any] = Depends(preparo_atual)):
+def upsert_rascunho(payload: dict[str, Any], preparo: dict[str, Any] = Depends(preparo_editavel)):
     """Grava o rascunho. Se outra pessoa o alterou depois da última leitura, responde 409 com a versão atual."""
     with db_session() as conn:
         try:
@@ -36,7 +36,7 @@ def upsert_rascunho(payload: dict[str, Any], preparo: dict[str, Any] = Depends(p
 
 
 @router.delete("")
-def delete_rascunho(preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, bool]:
+def delete_rascunho(preparo: dict[str, Any] = Depends(preparo_editavel)) -> dict[str, bool]:
     with db_session() as conn:
         clear_rascunho(conn, preparo["id"])
     return {"ok": True}

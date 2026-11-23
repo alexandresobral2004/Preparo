@@ -8,6 +8,8 @@ interface CabecalhoViewProps {
   onChange: (updated: PreparoDraft) => void;
   dataInputRef: React.RefObject<HTMLInputElement | null>;
   pesosSugestoes: PesoSugestao[];
+  /** Acompanhante: o fieldset desabilita tudo lá dentro (campos e botões). */
+  somenteLeitura?: boolean;
 }
 
 export const CabecalhoView: React.FC<CabecalhoViewProps> = ({
@@ -15,6 +17,7 @@ export const CabecalhoView: React.FC<CabecalhoViewProps> = ({
   onChange,
   dataInputRef,
   pesosSugestoes,
+  somenteLeitura = false,
 }) => {
   const updateField = <K extends keyof PreparoDraft>(key: K, value: PreparoDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -52,7 +55,7 @@ export const CabecalhoView: React.FC<CabecalhoViewProps> = ({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+    <fieldset disabled={somenteLeitura} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: "14px" }}>
       <section className="card">
         <div className="card-header">
           <h2 className="card-title">Dados do preparo</h2>
@@ -340,6 +343,6 @@ export const CabecalhoView: React.FC<CabecalhoViewProps> = ({
           />
         </div>
       </section>
-    </div>
+    </fieldset>
   );
 };

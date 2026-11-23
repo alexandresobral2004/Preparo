@@ -86,7 +86,8 @@ export const AuthGate: React.FC = () => {
         if (u && p) {
           setUsuario(u);
           setPreparoAtivo(p.id);
-          setPreparo(p);
+          // cache de versão antiga não tinha minhaPermissao; o servidor continua sendo a fonte da verdade
+          setPreparo({ ...p, minhaPermissao: p.minhaPermissao ?? "editar" });
           setFase("app");
         } else {
           setFase("login");

@@ -19,7 +19,7 @@ from ..database import (
 )
 from ..domain import calcular_totais_por_tipo, try_parse_decimal_ptbr
 from ..exporter import import_registros_json, registros_to_csv
-from ..preparos import preparo_atual
+from ..preparos import preparo_atual, preparo_editavel
 from ..schemas import ImportRequest, ImportSummary, RegistroPayload
 
 router = APIRouter(prefix="/api/registros", tags=["registros"])
@@ -67,7 +67,7 @@ def export_json(preparo: dict[str, Any] = Depends(preparo_atual)) -> list[dict[s
 
 
 @router.post("/import", response_model=ImportSummary)
-def import_json(body: ImportRequest, preparo: dict[str, Any] = Depends(preparo_atual)) -> ImportSummary:
+def import_json(body: ImportRequest, preparo: dict[str, Any] = Depends(preparo_editavel)) -> ImportSummary:
     with db_session() as conn:
         try:
             res = import_registros_json(conn, body.payload, preparo_id=preparo["id"])
@@ -87,7 +87,7 @@ def get_one_registro(reg_id: str, preparo: dict[str, Any] = Depends(preparo_atua
 
 @router.post("", status_code=201)
 def create_or_save_registro(
-    payload: RegistroPayload, preparo: dict[str, Any] = Depends(preparo_atual)
+    payload: RegistroPayload, preparo: dict[str, Any] = Depends(preparo_editavel)
 ) -> dict[str, Any]:
     if not payload.data.strip():
         raise HTTPException(
@@ -109,7 +109,7 @@ def create_or_save_registro(
 
 @router.put("/{reg_id}")
 def update_registro(
-    reg_id: str, payload: RegistroPayload, preparo: dict[str, Any] = Depends(preparo_atual)
+    reg_id: str, payload: RegistroPayload, preparo: dict[str, Any] = Depends(preparo_editavel)
 ) -> dict[str, Any]:
     if not payload.data.strip():
         raise HTTPException(
@@ -129,7 +129,7 @@ def update_registro(
 
 
 @router.delete("/{reg_id}")
-def remove_registro(reg_id: str, preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, Any]:
+def remove_registro(reg_id: str, preparo: dict[str, Any] = Depends(preparo_editavel)) -> dict[str, Any]:
     with db_session() as conn:
         ok = delete_registro(conn, reg_id, preparo["id"])
         if not ok:

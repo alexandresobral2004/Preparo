@@ -69,7 +69,9 @@ def test_pedido_de_entrada_so_vale_depois_que_o_dono_aprova(monkeypatch, tmp_pat
     assert pendente["situacao"] == "pendente"
     assert next(p for p in maria.get("/api/preparos").json() if p["id"] == pid)["pendentes"] == 1
 
-    res = maria.patch(f"/api/preparos/{pid}/membros/{pendente['usuarioId']}", json={"situacao": "aprovado"})
+    res = maria.patch(
+        f"/api/preparos/{pid}/membros/{pendente['usuarioId']}", json={"situacao": "aprovado", "permissao": "editar"}
+    )
     assert res.status_code == 200
     assert joao.get("/api/registros", headers={HDR: pid}).status_code == 200
 
@@ -89,7 +91,7 @@ def test_so_o_dono_gerencia_membros_e_o_dono_nao_pode_ser_alterado(monkeypatch, 
     uid_joao = next(m for m in maria.get(f"/api/preparos/{pid}/membros").json() if m["nome"] == "João")["usuarioId"]
 
     assert joao.get(f"/api/preparos/{pid}/membros").status_code == 403
-    auto = joao.patch(f"/api/preparos/{pid}/membros/{uid_joao}", json={"situacao": "aprovado"})
+    auto = joao.patch(f"/api/preparos/{pid}/membros/{uid_joao}", json={"situacao": "aprovado", "permissao": "editar"})
     assert auto.status_code == 403  # não aprova a si mesmo
 
     uid_maria = next(m for m in maria.get(f"/api/preparos/{pid}/membros").json() if m["papel"] == "dono")["usuarioId"]
@@ -170,7 +172,7 @@ def _com_joao_aprovado(monkeypatch, tmp_path: Path):
     maria, joao, pid = _equipe(monkeypatch, tmp_path)
     joao.post(f"/api/preparos/{pid}/solicitar")
     uid = next(m for m in maria.get(f"/api/preparos/{pid}/membros").json() if m["nome"] == "João")["usuarioId"]
-    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado"})
+    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "editar"})
     return maria, joao, {HDR: pid}
 
 
@@ -288,3 +290,189 @@ def test_gravar_o_mesmo_conteudo_nao_muda_a_versao(monkeypatch, tmp_path: Path) 
     assert repetido["_updatedAt"] == v1["_updatedAt"]
     mudou = maria.put("/api/rascunho", json={**_rascunho(11), "_versao": v1["_versao"]}, headers=h).json()
     assert mudou["_versao"] == v1["_versao"] + 1
+
+
+_MEMBROS_ANTIGO = """
+CREATE TABLE preparo_membros (
+    preparo_id TEXT NOT NULL REFERENCES preparos(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    papel TEXT NOT NULL CHECK (papel IN ('dono', 'membro')),
+    situacao TEXT NOT NULL CHECK (situacao IN ('pendente', 'aprovado', 'recusado')),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (preparo_id, usuario_id)
+);
+"""
+
+
+def _banco_com_membros_antigos(db) -> None:
+    """Banco criado antes da coluna permissao: membros existentes, sem a coluna."""
+    import sqlite3
+
+    from app.database import init_db
+
+    init_db(db)
+    con = sqlite3.connect(db)
+    con.execute("DROP TABLE preparo_membros")
+    con.executescript(_MEMBROS_ANTIGO)
+    con.execute("INSERT INTO preparos (id, nome, criado_por, created_at) VALUES ('p1', 'Bendito', 1, 't')")
+    con.execute(
+        "INSERT INTO preparo_membros (preparo_id, usuario_id, papel, situacao, created_at) "
+        "VALUES ('p1', 1, 'dono', 'aprovado', 't'), ('p1', 2, 'membro', 'aprovado', 't')"
+    )
+    con.commit()
+    con.close()
+
+
+def test_banco_antigo_ganha_permissao_e_membros_existentes_ficam_editar(tmp_path: Path) -> None:
+    import sqlite3
+
+    from app.database import init_db
+
+    db = tmp_path / "antigo.db"
+    _banco_com_membros_antigos(db)
+    init_db(db)
+
+    con = sqlite3.connect(db)
+    linhas = con.execute("SELECT usuario_id, permissao FROM preparo_membros ORDER BY usuario_id").fetchall()
+    assert linhas == [(1, "editar"), (2, "editar")]
+
+
+def test_inicializar_o_banco_duas_vezes_nao_muda_as_permissoes(tmp_path: Path) -> None:
+    import sqlite3
+
+    from app.database import init_db
+
+    db = tmp_path / "antigo.db"
+    _banco_com_membros_antigos(db)
+    init_db(db)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE preparo_membros SET permissao = 'acompanhar' WHERE usuario_id = 2")
+    con.commit()
+    con.close()
+
+    init_db(db)  # segunda vez: não pode falhar nem reverter a escolha do dono
+    assert sqlite3.connect(db).execute(
+        "SELECT permissao FROM preparo_membros WHERE usuario_id = 2"
+    ).fetchone() == ("acompanhar",)
+
+
+def test_permissao_invalida_e_barrada_pelo_banco(tmp_path: Path) -> None:
+    import sqlite3
+
+    import pytest
+
+    from app.database import init_db
+
+    db = tmp_path / "novo.db"
+    init_db(db)
+    con = sqlite3.connect(db)
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute(
+            "INSERT INTO preparo_membros (preparo_id, usuario_id, papel, situacao, permissao, created_at) "
+            "VALUES ('p1', 1, 'membro', 'aprovado', 'admin', 't')"
+        )
+
+
+def test_dono_criado_pelo_app_e_pela_migracao_v1_fica_editar(monkeypatch, tmp_path: Path) -> None:
+    import sqlite3
+
+    from app.database import _upsert_registro_conn, adotar_dados_legados, db_session, init_db
+
+    db = tmp_path / "preparos.db"
+    monkeypatch.setenv("PREPARO_DB_PATH", str(db))
+    init_db()
+    maria, _, pid = _equipe(monkeypatch, tmp_path)
+    assert sqlite3.connect(db).execute(
+        "SELECT permissao FROM preparo_membros WHERE preparo_id = ? AND papel = 'dono'", (pid,)
+    ).fetchone() == ("editar",)
+
+    with db_session() as conn:  # migração v1: dados antigos sem preparo ganham um dono
+        _upsert_registro_conn(conn, {"id": "reg-antigo", **REGISTRO}, origem="seed")
+        adotar_dados_legados(conn, 1)
+    assert sqlite3.connect(db).execute(
+        "SELECT permissao FROM preparo_membros WHERE papel = 'dono' AND preparo_id != ?", (pid,)
+    ).fetchone() == ("editar",)
+
+
+def _membro(cliente: TestClient, pid: str, nome: str) -> dict:
+    return next(m for m in cliente.get(f"/api/preparos/{pid}/membros").json() if m["nome"] == nome)
+
+
+def test_aprovar_sem_permissao_da_422_e_a_pessoa_continua_pendente(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    assert maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado"}).status_code == 422
+    assert _membro(maria, pid, "João")["situacao"] == "pendente"
+
+
+def test_aprovar_grava_a_permissao_escolhida_pelo_dono(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    for permissao in ("acompanhar", "editar"):
+        body = {"situacao": "aprovado", "permissao": permissao}
+        assert maria.patch(f"/api/preparos/{pid}/membros/{uid}", json=body).status_code == 200
+        atual = _membro(maria, pid, "João")
+        assert (atual["situacao"], atual["permissao"]) == ("aprovado", permissao)
+
+
+def test_dono_troca_a_permissao_de_quem_ja_e_aprovado(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "editar"})
+    assert maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "acompanhar"}).status_code == 200
+    assert _membro(maria, pid, "João")["permissao"] == "acompanhar"
+    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "editar"})
+    assert _membro(maria, pid, "João")["permissao"] == "editar"
+
+
+def test_recusar_nao_exige_permissao_e_nao_a_grava(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    assert maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "recusado"}).status_code == 200
+    assert _membro(maria, pid, "João")["permissao"] == "editar"  # valor de fábrica da linha, intocado
+
+
+def test_dono_nao_pode_mudar_a_propria_permissao(monkeypatch, tmp_path: Path) -> None:
+    maria, _, pid = _equipe(monkeypatch, tmp_path)
+    uid = _membro(maria, pid, "Maria")["usuarioId"]
+    res = maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "acompanhar"})
+    assert res.status_code == 400
+    assert _membro(maria, pid, "Maria")["permissao"] == "editar"
+
+
+def test_nao_dono_nao_muda_permissao_de_ninguem(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    res = joao.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "editar"})
+    assert res.status_code == 403
+
+
+def test_get_membros_devolve_a_permissao(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "acompanhar"})
+    assert {m["nome"]: m["permissao"] for m in maria.get(f"/api/preparos/{pid}/membros").json()} == {
+        "Maria": "editar",
+        "João": "acompanhar",
+    }
+
+
+def test_get_preparos_devolve_minha_permissao(monkeypatch, tmp_path: Path) -> None:
+    maria, joao, pid = _equipe(monkeypatch, tmp_path)
+
+    def minha(cliente) -> object:
+        return next(p for p in cliente.get("/api/preparos").json() if p["id"] == pid)["minhaPermissao"]
+
+    assert minha(maria) == "editar"  # dono
+    assert minha(joao) is None  # sem vínculo
+    joao.post(f"/api/preparos/{pid}/solicitar")
+    assert minha(joao) is None  # pendente
+    uid = _membro(maria, pid, "João")["usuarioId"]
+    maria.patch(f"/api/preparos/{pid}/membros/{uid}", json={"situacao": "aprovado", "permissao": "acompanhar"})
+    assert minha(joao) == "acompanhar"

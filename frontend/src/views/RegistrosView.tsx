@@ -14,6 +14,8 @@ interface RegistrosViewProps {
   onDeleteRegistro: (id: string) => Promise<void>;
   onImportJson: (rawText: string) => Promise<void>;
   onRescueJson: () => Promise<string>;
+  /** Acompanhante: sem excluir, importar nem resgatar; abrir e exportar continuam. */
+  somenteLeitura?: boolean;
 }
 
 export const RegistrosView: React.FC<RegistrosViewProps> = ({
@@ -22,6 +24,7 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
   onDeleteRegistro,
   onImportJson,
   onRescueJson,
+  somenteLeitura = false,
 }) => {
   const [importText, setImportText] = useState("");
   const [erroExclusao, setErroExclusao] = useState<{ id: string; msg: string } | null>(null);
@@ -185,16 +188,18 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
                   >
                     Abrir
                   </button>
-                  <ConfirmButton
-                    label="Excluir"
-                    contexto={`registro de ${formatDateBr(reg.data)}`}
-                    onConfirm={() => {
-                      setErroExclusao(null);
-                      onDeleteRegistro(reg.id).catch((err: unknown) =>
-                        setErroExclusao({ id: reg.id, msg: err instanceof Error ? err.message : "Erro ao excluir registro." }),
-                      );
-                    }}
-                  />
+                  {!somenteLeitura && (
+                    <ConfirmButton
+                      label="Excluir"
+                      contexto={`registro de ${formatDateBr(reg.data)}`}
+                      onConfirm={() => {
+                        setErroExclusao(null);
+                        onDeleteRegistro(reg.id).catch((err: unknown) =>
+                          setErroExclusao({ id: reg.id, msg: err instanceof Error ? err.message : "Erro ao excluir registro." }),
+                        );
+                      }}
+                    />
+                  )}
                 </div>
               </article>
             ))}
@@ -205,7 +210,7 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
       {/* Exportação, Importação e Resgate (RF-22 a RF-24) */}
       <section className="card">
         <div className="card-header">
-          <h2 className="card-title">Exportar, importar e resgatar</h2>
+          <h2 className="card-title">{somenteLeitura ? "Exportar" : "Exportar, importar e resgatar"}</h2>
         </div>
 
         <div className="row-actions">
@@ -220,9 +225,11 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
           <button type="button" className="btn" onClick={handleDownloadJson}>
             Exportar JSON
           </button>
-          <button type="button" className="btn" onClick={handleRescue}>
-            Resgatar dados
-          </button>
+          {!somenteLeitura && (
+            <button type="button" className="btn" onClick={handleRescue}>
+              Resgatar dados
+            </button>
+          )}
         </div>
 
         {rescueText && (
@@ -240,43 +247,47 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
           </div>
         )}
 
-        <div className="field">
-          <label className="field-label" htmlFor="reg-import-file">
-            Importar arquivo JSON
-          </label>
-          <input
-            id="reg-import-file"
-            type="file"
-            accept=".json,application/json"
-            className="input"
-            onChange={handleFileChange}
-          />
-        </div>
+        {!somenteLeitura && (
+          <>
+            <div className="field">
+              <label className="field-label" htmlFor="reg-import-file">
+                Importar arquivo JSON
+              </label>
+              <input
+                id="reg-import-file"
+                type="file"
+                accept=".json,application/json"
+                className="input"
+                onChange={handleFileChange}
+              />
+            </div>
 
-        <div className="field">
-          <label className="field-label" htmlFor="reg-import-text">
-            Ou colar texto JSON
-          </label>
-          <textarea
-            id="reg-import-text"
-            className="textarea tabular"
-            placeholder="Cole aqui o JSON exportado ou resgatado..."
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-          />
-        </div>
+            <div className="field">
+              <label className="field-label" htmlFor="reg-import-text">
+                Ou colar texto JSON
+              </label>
+              <textarea
+                id="reg-import-text"
+                className="textarea tabular"
+                placeholder="Cole aqui o JSON exportado ou resgatado..."
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+              />
+            </div>
 
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!importText.trim()}
-          onClick={async () => {
-            await onImportJson(importText);
-            setImportText("");
-          }}
-        >
-          Importar JSON colado
-        </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!importText.trim()}
+              onClick={async () => {
+                await onImportJson(importText);
+                setImportText("");
+              }}
+            >
+              Importar JSON colado
+            </button>
+          </>
+        )}
       </section>
     </div>
   );

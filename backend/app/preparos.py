@@ -20,7 +20,7 @@ def preparo_atual(request: Request, usuario: dict[str, Any] = Depends(exigir_log
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT p.id, p.nome, m.papel
+            SELECT p.id, p.nome, m.papel, m.permissao
             FROM preparos p JOIN preparo_membros m ON m.preparo_id = p.id
             WHERE p.id = ? AND m.usuario_id = ? AND m.situacao = 'aprovado'
             """,
@@ -29,4 +29,15 @@ def preparo_atual(request: Request, usuario: dict[str, Any] = Depends(exigir_log
     # Mesmo erro para "não existe" e "não participa": não revela quais preparos existem.
     if row is None:
         raise HTTPException(status_code=403, detail="Você não participa deste preparo.")
-    return {"id": row["id"], "nome": row["nome"], "papel": row["papel"], "usuario": usuario}
+    permissao = "editar" if row["papel"] == "dono" else row["permissao"]
+    return {"id": row["id"], "nome": row["nome"], "papel": row["papel"], "permissao": permissao, "usuario": usuario}
+
+
+def preparo_editavel(preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, Any]:
+    """Para rotas que gravam: quem só acompanha recebe 403. Lê a permissão no banco a cada requisição."""
+    if preparo["permissao"] != "editar":
+        raise HTTPException(
+            status_code=403,
+            detail="Você participa deste preparo só para acompanhar. Peça ao dono permissão para editar.",
+        )
+    return preparo

@@ -9,6 +9,7 @@ import {
   ordenarUsuarios,
   rotuloGrau,
   normalizarEmail,
+  podeEditar,
   validarEmail,
   validarEntrar,
   validarNovaSenha,
@@ -186,5 +187,21 @@ describe("mesclarRespostaDoRascunho", () => {
   it("devolve o mesmo objeto quando nada mudou (evita novo envio à toa)", () => {
     const local: PreparoDraft = { ...createEmptyPreparo(), _versao: 2, blocos: [{ ...createEmptyBloco(1), autoria }] };
     expect(mesclarRespostaDoRascunho(local, { ...local })).toBe(local);
+  });
+});
+
+describe("podeEditar", () => {
+  const preparo = (minhaPermissao: "editar" | "acompanhar" | null) => ({ minhaPermissao });
+
+  it("libera quem edita e o dono (que recebe 'editar' do servidor)", () => {
+    expect(podeEditar(preparo("editar"))).toBe(true);
+  });
+
+  it("bloqueia quem só acompanha", () => {
+    expect(podeEditar(preparo("acompanhar"))).toBe(false);
+  });
+
+  it("bloqueia quem não tem vínculo aprovado", () => {
+    expect(podeEditar(preparo(null))).toBe(false);
   });
 });

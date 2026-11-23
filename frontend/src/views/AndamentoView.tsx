@@ -45,6 +45,8 @@ interface AndamentoViewProps {
   onToggleLembrete: (id: string, feito: boolean) => Promise<void>;
   onDeleteLembrete: (id: string) => Promise<void>;
   onGoToPanelas: () => void;
+  /** Acompanhante: sem ajustes de aviso, sem lembrete novo, sem marcar nem excluir. */
+  somenteLeitura?: boolean;
 }
 
 const ESTADO_TEXT: Record<PanelaEstado, string> = {
@@ -64,6 +66,7 @@ export const AndamentoView: React.FC<AndamentoViewProps> = ({
   onAddLembrete,
   onToggleLembrete,
   onDeleteLembrete,
+  somenteLeitura = false,
   onGoToPanelas,
 }) => {
   const [filtro, setFiltro] = useState<FiltroAndamento>("todas");
@@ -184,21 +187,23 @@ export const AndamentoView: React.FC<AndamentoViewProps> = ({
             </button>
           ))}
 
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setMetaInput(String(config.metaLitrosPadrao).replace(".", ","));
-              setMinFervInput(String(config.minSemFervura));
-              setHorasColInput(String(config.horasSemColheita).replace(".", ","));
-              setShowCalib((s) => !s);
-            }}
-          >
-            {showCalib ? "Fechar ajustes" : "Ajustes & Estatística"}
-          </button>
+          {!somenteLeitura && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setMetaInput(String(config.metaLitrosPadrao).replace(".", ","));
+                setMinFervInput(String(config.minSemFervura));
+                setHorasColInput(String(config.horasSemColheita).replace(".", ","));
+                setShowCalib((s) => !s);
+              }}
+            >
+              {showCalib ? "Fechar ajustes" : "Ajustes & Estatística"}
+            </button>
+          )}
         </div>
 
-        {showCalib && (
+        {showCalib && !somenteLeitura && (
           <form
             onSubmit={handleApplyConfig}
             style={{
@@ -378,42 +383,44 @@ export const AndamentoView: React.FC<AndamentoViewProps> = ({
           <h2 className="card-title">Lembretes</h2>
         </div>
 
-        <form onSubmit={handleAddLembrete} className="field-grid">
-          <div className="field">
-            <label className="field-label" htmlFor="lem-texto">
-              Novo lembrete
-            </label>
-            <input
-              id="lem-texto"
-              type="text"
-              className="input"
-              placeholder="Ex.: Conferir lenha da fornalha"
-              value={lemTexto}
-              onChange={(e) => setLemTexto(e.target.value)}
-            />
-          </div>
-
-          <div className="pan-cols">
+        {!somenteLeitura && (
+          <form onSubmit={handleAddLembrete} className="field-grid">
             <div className="field">
-              <label className="field-label" htmlFor="lem-hora">
-                Horário (opcional)
+              <label className="field-label" htmlFor="lem-texto">
+                Novo lembrete
               </label>
               <input
-                id="lem-hora"
-                type="time"
-                className="input tabular"
-                value={lemHorario}
-                onChange={(e) => setLemHorario(e.target.value)}
+                id="lem-texto"
+                type="text"
+                className="input"
+                placeholder="Ex.: Conferir lenha da fornalha"
+                value={lemTexto}
+                onChange={(e) => setLemTexto(e.target.value)}
               />
             </div>
 
-            <div className="field" style={{ justifyContent: "flex-end" }}>
-              <button type="submit" className="btn btn-primary">
-                Adicionar
-              </button>
+            <div className="pan-cols">
+              <div className="field">
+                <label className="field-label" htmlFor="lem-hora">
+                  Horário (opcional)
+                </label>
+                <input
+                  id="lem-hora"
+                  type="time"
+                  className="input tabular"
+                  value={lemHorario}
+                  onChange={(e) => setLemHorario(e.target.value)}
+                />
+              </div>
+
+              <div className="field" style={{ justifyContent: "flex-end" }}>
+                <button type="submit" className="btn btn-primary">
+                  Adicionar
+                </button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        )}
 
         {lembretes.length === 0 ? (
           <div className="muted">Nenhum lembrete adicionado.</div>
@@ -442,6 +449,7 @@ export const AndamentoView: React.FC<AndamentoViewProps> = ({
                     <input
                       type="checkbox"
                       className="reminder-check"
+                      disabled={somenteLeitura}
                       checked={lem.feito}
                       onChange={(e) => onToggleLembrete(lem.id, e.target.checked)}
                     />
@@ -454,14 +462,16 @@ export const AndamentoView: React.FC<AndamentoViewProps> = ({
                     </span>
                   </label>
 
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => onDeleteLembrete(lem.id)}
-                    aria-label={`Excluir lembrete ${lem.texto}`}
-                  >
-                    Excluir
-                  </button>
+                  {!somenteLeitura && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => onDeleteLembrete(lem.id)}
+                      aria-label={`Excluir lembrete ${lem.texto}`}
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </div>
               );
             })}

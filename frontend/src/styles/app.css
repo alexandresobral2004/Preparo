@@ -326,6 +326,14 @@ textarea {
   cursor: not-allowed;
 }
 
+/* Acompanhante: campos dentro de um fieldset desabilitado ficam visivelmente somente leitura. */
+fieldset:disabled .input,
+fieldset:disabled .textarea,
+fieldset:disabled select {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--brand);
   border-color: var(--brand);

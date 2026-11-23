@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auth import SENHA_MIN
 from .domain import normalizar_tipo, parse_decimal_ptbr
@@ -260,12 +260,23 @@ class PreparoNovo(BaseModel):
     nome: str = Field(min_length=1, max_length=80)
 
 
+PermissaoMembro = Literal["editar", "acompanhar"]
+
+
 class MembroSituacaoIn(BaseModel):
     situacao: Literal["aprovado", "recusado"]
+    permissao: PermissaoMembro | None = None  # obrigatória ao aprovar; ignorada ao recusar
+
+    @model_validator(mode="after")
+    def _permissao_obrigatoria_ao_aprovar(self) -> "MembroSituacaoIn":
+        if self.situacao == "aprovado" and self.permissao is None:
+            raise ValueError("Escolha se a pessoa pode editar ou só acompanhar.")
+        return self
 
 
 class MembroNovoIn(BaseModel):
     email: str
+    permissao: PermissaoMembro
 
     @field_validator("email")
     @classmethod

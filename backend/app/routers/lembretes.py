@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..database import db_session, now_iso
-from ..preparos import preparo_atual
+from ..preparos import preparo_atual, preparo_editavel
 from ..schemas import LembreteCreate, LembretePatch
 
 router = APIRouter(prefix="/api/lembretes", tags=["lembretes"])
@@ -35,7 +35,7 @@ def list_lembretes(preparo: dict[str, Any] = Depends(preparo_atual)) -> list[dic
 
 
 @router.post("", status_code=201)
-def create_lembrete(body: LembreteCreate, preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, Any]:
+def create_lembrete(body: LembreteCreate, preparo: dict[str, Any] = Depends(preparo_editavel)) -> dict[str, Any]:
     lid = f"lem-{uuid.uuid4().hex[:10]}"
     ts = now_iso()
     with db_session() as conn:
@@ -49,7 +49,7 @@ def create_lembrete(body: LembreteCreate, preparo: dict[str, Any] = Depends(prep
 
 @router.patch("/{lembrete_id}")
 def patch_lembrete(
-    lembrete_id: str, body: LembretePatch, preparo: dict[str, Any] = Depends(preparo_atual)
+    lembrete_id: str, body: LembretePatch, preparo: dict[str, Any] = Depends(preparo_editavel)
 ) -> dict[str, Any]:
     with db_session() as conn:
         row = conn.execute(
@@ -71,7 +71,7 @@ def patch_lembrete(
 
 
 @router.delete("/{lembrete_id}")
-def delete_lembrete(lembrete_id: str, preparo: dict[str, Any] = Depends(preparo_atual)) -> dict[str, Any]:
+def delete_lembrete(lembrete_id: str, preparo: dict[str, Any] = Depends(preparo_editavel)) -> dict[str, Any]:
     with db_session() as conn:
         cur = conn.execute(
             "DELETE FROM lembretes WHERE id = ? AND preparo_id = ?", (lembrete_id, preparo["id"])

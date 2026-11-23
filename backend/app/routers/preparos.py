@@ -36,7 +36,7 @@ def listar(usuario: dict[str, Any] = Depends(exigir_login)) -> list[dict[str, An
         rows = conn.execute(
             """
             SELECT p.id, p.nome, u.nome AS dono_nome,
-                   m.papel AS meu_papel, m.situacao AS minha_situacao,
+                   m.papel AS meu_papel, m.situacao AS minha_situacao, m.permissao AS minha_permissao,
                    (SELECT COUNT(*) FROM preparo_membros x
                      WHERE x.preparo_id = p.id AND x.situacao = 'pendente') AS pendentes
             FROM preparos p
@@ -53,10 +53,17 @@ def listar(usuario: dict[str, Any] = Depends(exigir_login)) -> list[dict[str, An
             "donoNome": r["dono_nome"],
             "meuPapel": r["meu_papel"],
             "minhaSituacao": r["minha_situacao"],
+            "minhaPermissao": _minha_permissao(r),
             "pendentes": r["pendentes"] if r["meu_papel"] == "dono" else 0,
         }
         for r in rows
     ]
+
+
+def _minha_permissao(r: sqlite3.Row) -> str | None:
+    if r["meu_papel"] == "dono":
+        return "editar"
+    return r["minha_permissao"] if r["minha_situacao"] == "aprovado" else None
 
 
 @router.post("", status_code=201)
@@ -103,7 +110,7 @@ def listar_membros(preparo_id: str, usuario: dict[str, Any] = Depends(exigir_log
         _exigir_dono(conn, preparo_id, usuario["id"])
         rows = conn.execute(
             """
-            SELECT m.usuario_id, u.nome, u.login, u.email, m.papel, m.situacao
+            SELECT m.usuario_id, u.nome, u.login, u.email, m.papel, m.situacao, m.permissao
             FROM preparo_membros m JOIN usuarios u ON u.id = m.usuario_id
             WHERE m.preparo_id = ?
             ORDER BY CASE m.papel WHEN 'dono' THEN 0 ELSE 1 END, u.nome COLLATE NOCASE
@@ -118,6 +125,7 @@ def listar_membros(preparo_id: str, usuario: dict[str, Any] = Depends(exigir_log
             "email": r["email"],
             "papel": r["papel"],
             "situacao": r["situacao"],
+            "permissao": r["permissao"],
         }
         for r in rows
     ]
@@ -148,9 +156,9 @@ def adicionar_membro(
         if atual is None:
             try:
                 conn.execute(
-                    "INSERT INTO preparo_membros (preparo_id, usuario_id, papel, situacao, created_at) "
-                    "VALUES (?, ?, 'membro', 'aprovado', ?)",
-                    (preparo_id, pessoa["id"], now_iso()),
+                    "INSERT INTO preparo_membros (preparo_id, usuario_id, papel, situacao, permissao, created_at) "
+                    "VALUES (?, ?, 'membro', 'aprovado', ?, ?)",
+                    (preparo_id, pessoa["id"], body.permissao, now_iso()),
                 )
             except sqlite3.IntegrityError:
                 pass  # corrida: outra requisição inseriu a mesma linha depois da checagem; relê abaixo
@@ -159,12 +167,19 @@ def adicionar_membro(
                 (preparo_id, pessoa["id"]),
             ).fetchone()
         papel = atual["papel"]
-        if atual["situacao"] != "aprovado":  # pendente ou recusado: o convite explícito do dono aprova
+        permissao = "editar" if papel == "dono" else body.permissao  # o dono nunca é rebaixado pelo convite
+        if papel != "dono":  # pendente, recusado ou já aprovado: o convite explícito do dono aprova e define a permissão
             conn.execute(
-                "UPDATE preparo_membros SET situacao = 'aprovado' WHERE preparo_id = ? AND usuario_id = ?",
-                (preparo_id, pessoa["id"]),
+                "UPDATE preparo_membros SET situacao = 'aprovado', permissao = ? WHERE preparo_id = ? AND usuario_id = ?",
+                (permissao, preparo_id, pessoa["id"]),
             )
-    return {"usuarioId": pessoa["id"], "nome": pessoa["nome"], "papel": papel, "situacao": "aprovado"}
+    return {
+        "usuarioId": pessoa["id"],
+        "nome": pessoa["nome"],
+        "papel": papel,
+        "situacao": "aprovado",
+        "permissao": permissao,
+    }
 
 
 @router.patch("/{preparo_id}/membros/{usuario_id}")
@@ -184,8 +199,11 @@ def decidir_membro(
             raise HTTPException(status_code=404, detail="Membro não encontrado.")
         if alvo["papel"] == "dono":
             raise HTTPException(status_code=400, detail="O dono do preparo não pode ser alterado.")
+        # Permissão só muda ao aprovar; ao recusar, COALESCE mantém a que a linha já tem.
+        permissao = body.permissao if body.situacao == "aprovado" else None
         conn.execute(
-            "UPDATE preparo_membros SET situacao = ? WHERE preparo_id = ? AND usuario_id = ?",
-            (body.situacao, preparo_id, usuario_id),
+            "UPDATE preparo_membros SET situacao = ?, permissao = COALESCE(?, permissao) "
+            "WHERE preparo_id = ? AND usuario_id = ?",
+            (body.situacao, permissao, preparo_id, usuario_id),
         )
     return {"situacao": body.situacao}
