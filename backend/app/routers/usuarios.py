@@ -30,6 +30,13 @@ SELECT EXISTS(SELECT 1 FROM preparos WHERE criado_por = :id)
 """
 
 
+def _email_em_uso(conn: sqlite3.Connection, email: str, usuario_id: int | None = None) -> bool:
+    """E-mail (ou login antigo igual) de outra conta. Em criação, usuario_id é None."""
+    return conn.execute(
+        "SELECT 1 FROM usuarios WHERE (email = ? OR login = ?) AND id IS NOT ?", (email, email, usuario_id)
+    ).fetchone() is not None
+
+
 def _admins_ativos(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM usuarios WHERE papel = 'admin' AND situacao = 'ativo'").fetchone()[0]
 
@@ -53,7 +60,7 @@ def _anonimiza(conn: sqlite3.Connection, usuario_id: int) -> None:
     """Tira a identidade da conta e mantém a linha (FKs e histórico continuam válidos)."""
     senha_descartada = auth.hash_senha(secrets.token_urlsafe(32))  # ninguém conhece: a conta não loga mais
     conn.execute(
-        "UPDATE usuarios SET nome = ?, login = ?, senha_hash = ?, situacao = 'inativo', grau = '', nucleo = '' "
+        "UPDATE usuarios SET nome = ?, login = ?, email = NULL, senha_hash = ?, situacao = 'inativo', grau = '', nucleo = '' "
         "WHERE id = ?",
         (NOME_REMOVIDO, f"{PREFIXO_USUARIO_REMOVIDO}{usuario_id}", senha_descartada, usuario_id),
     )
@@ -101,12 +108,12 @@ def listar() -> list[dict[str, Any]]:
 @router.post("", status_code=201)
 def criar(body: UsuarioNovo) -> dict[str, Any]:
     with db_session() as conn:
-        if conn.execute("SELECT 1 FROM usuarios WHERE login = ?", (body.login,)).fetchone():
-            raise HTTPException(status_code=409, detail="Já existe um usuário com esse login.")
+        if _email_em_uso(conn, body.email):
+            raise HTTPException(status_code=409, detail="Este e-mail já está em uso por outra conta.")
         cur = conn.execute(
-            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at, grau, nucleo) "
-            "VALUES (?, ?, ?, ?, 'ativo', ?, ?, ?)",
-            (body.login, body.nome, auth.hash_senha(body.senha), body.papel, now_iso(), body.grau, body.nucleo),
+            "INSERT INTO usuarios (login, email, nome, senha_hash, papel, situacao, created_at, grau, nucleo) "
+            "VALUES (?, ?, ?, ?, ?, 'ativo', ?, ?, ?)",
+            (body.email, body.email, body.nome, auth.hash_senha(body.senha), body.papel, now_iso(), body.grau, body.nucleo),
         )
         row = conn.execute("SELECT * FROM usuarios WHERE id = ?", (cur.lastrowid,)).fetchone()
         return auth.usuario_publico(row)
@@ -125,15 +132,23 @@ def editar(usuario_id: int, body: UsuarioEdicao, admin: dict[str, Any] = Depends
             raise HTTPException(status_code=400, detail="Você não pode alterar o próprio papel ou situação.")
         novo_ativo = nova_situacao == "ativo"
         _preserva_admin(conn, row, novo_papel, nova_situacao)
+        if body.email is not None and _email_em_uso(conn, body.email, usuario_id):
+            raise HTTPException(status_code=409, detail="Este e-mail já está em uso por outra conta.")
 
         conn.execute(
-            "UPDATE usuarios SET nome = ?, papel = ?, situacao = ?, grau = ?, nucleo = ? WHERE id = ?",
+            "UPDATE usuarios SET nome = ?, papel = ?, situacao = ?, grau = ?, nucleo = ?, "
+            "email = COALESCE(?, email), "
+            "login = CASE WHEN ? IS NOT NULL AND instr(login, '@') > 0 THEN ? ELSE login END "
+            "WHERE id = ?",
             (
                 body.nome if body.nome else row["nome"],
                 novo_papel,
                 nova_situacao,
                 body.grau if body.grau is not None else row["grau"],
                 body.nucleo if body.nucleo is not None else row["nucleo"],
+                body.email,
+                body.email,
+                body.email,
                 usuario_id,
             ),
         )

@@ -218,6 +218,8 @@ export interface PesoSugestao {
 export interface Usuario {
   id: number;
   login: string;
+  /** null em contas antigas, criadas antes do e-mail. */
+  email: string | null;
   nome: string;
   papel: "admin" | "usuario";
   situacao: "pendente" | "ativo" | "inativo";
@@ -239,6 +241,7 @@ export interface MembroPreparo {
   usuarioId: number;
   nome: string;
   login: string;
+  email: string | null;
   papel: "dono" | "membro";
   situacao: "aprovado" | "pendente" | "recusado";
 }

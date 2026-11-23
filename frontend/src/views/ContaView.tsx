@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { decidirMembro, editarPerfil, listarMembros, trocarSenha } from "../api/auth";
+import { adicionarMembro, decidirMembro, editarPerfil, listarMembros, trocarSenha } from "../api/auth";
 import { ConfirmButton } from "../components/ConfirmButton";
-import { GRAUS, validarNovaSenha } from "../domain/auth";
+import { GRAUS, normalizarEmail, validarEmail, validarNovaSenha } from "../domain/auth";
 import type { MembroPreparo, PreparoResumo, Usuario } from "../types";
 
 interface ContaViewProps {
@@ -32,13 +32,18 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nova, setNova] = useState("");
   const [confirma, setConfirma] = useState("");
   const [erroSenha, setErroSenha] = useState("");
-  const [perfil, setPerfil] = useState({ nome: usuario.nome, grau: usuario.grau, nucleo: usuario.nucleo });
+  const [perfil, setPerfil] = useState({ nome: usuario.nome, grau: usuario.grau, nucleo: usuario.nucleo, email: usuario.email ?? "" });
+  const [senhaAtualPerfil, setSenhaAtualPerfil] = useState("");
+  const [erroPerfil, setErroPerfil] = useState("");
 
   const [membros, setMembros] = useState<MembroPreparo[]>([]);
   const [erroMembros, setErroMembros] = useState("");
+  const [emailParticipante, setEmailParticipante] = useState("");
+  const [enviandoParticipante, setEnviandoParticipante] = useState(false);
 
   const ehDono = preparo.meuPapel === "dono";
   const ehAdmin = usuario.papel === "admin";
+  const emailMudou = normalizarEmail(perfil.email) !== normalizarEmail(usuario.email ?? "");
 
   const carregar = useCallback(async () => {
     try {
@@ -83,15 +88,45 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
   const salvarPerfil = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!perfil.nome.trim()) return onNotify("Informe o nome.", "error");
-    if (!perfil.grau) return onNotify("Escolha o seu grau.", "error");
-    if (!perfil.nucleo.trim()) return onNotify("Informe o núcleo.", "error");
+    setErroPerfil("");
+    if (!perfil.nome.trim()) return setErroPerfil("Informe o nome.");
+    if (!perfil.grau) return setErroPerfil("Escolha o seu grau.");
+    if (!perfil.nucleo.trim()) return setErroPerfil("Informe o núcleo.");
+    if (emailMudou) {
+      const problemaEmail = validarEmail(perfil.email);
+      if (problemaEmail) return setErroPerfil(problemaEmail);
+      if (!senhaAtualPerfil) return setErroPerfil("Confirme sua senha atual para trocar o e-mail.");
+    }
     try {
-      const atualizado = await editarPerfil({ nome: perfil.nome.trim(), grau: perfil.grau, nucleo: perfil.nucleo.trim() });
+      const atualizado = await editarPerfil({
+        nome: perfil.nome.trim(),
+        grau: perfil.grau,
+        nucleo: perfil.nucleo.trim(),
+        ...(emailMudou ? { email: normalizarEmail(perfil.email), senhaAtual: senhaAtualPerfil } : {}),
+      });
       onUsuarioAtualizado(atualizado);
+      setSenhaAtualPerfil("");
       onNotify("Perfil salvo.", "info");
     } catch (err) {
-      onNotify((err as Error).message, "error");
+      setErroPerfil((err as Error).message);
+    }
+  };
+
+  const adicionarParticipante = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErroMembros("");
+    const problema = validarEmail(emailParticipante);
+    if (problema) return setErroMembros(problema);
+    setEnviandoParticipante(true);
+    try {
+      const adicionado = await adicionarMembro(preparo.id, normalizarEmail(emailParticipante));
+      setEmailParticipante("");
+      onNotify(`${adicionado.nome} agora participa deste preparo.`, "info");
+      await carregar();
+    } catch (err) {
+      setErroMembros((err as Error).message);
+    } finally {
+      setEnviandoParticipante(false);
     }
   };
 
@@ -115,12 +150,43 @@ export const ContaView: React.FC<ContaViewProps> = ({
         </div>
       </section>
 
-      <form className="card" onSubmit={salvarPerfil}>
+      <form className="card" onSubmit={salvarPerfil} noValidate>
         <h2 className="card-title">Meu perfil</h2>
+        {erroPerfil && <div className="alert-box alert-danger" role="alert">{erroPerfil}</div>}
         <div className="field">
           <label className="field-label" htmlFor="perfil-nome">Nome (aparece nos registros)</label>
           <input id="perfil-nome" className="input" autoComplete="name" maxLength={120} value={perfil.nome} onChange={(e) => setPerfil({ ...perfil, nome: e.target.value })} required />
         </div>
+        <div className="field">
+          <label className="field-label" htmlFor="perfil-email">E-mail</label>
+          <input
+            id="perfil-email"
+            className="input"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={perfil.email}
+            onChange={(e) => setPerfil({ ...perfil, email: e.target.value })}
+            aria-describedby={!usuario.email ? "perfil-email-dica" : undefined}
+          />
+          {!usuario.email && <p id="perfil-email-dica" className="muted">Opcional: adicione um e-mail para ser encontrado por outras pessoas.</p>}
+        </div>
+        {emailMudou && (
+          <div className="field">
+            <label className="field-label" htmlFor="perfil-senha-atual">Senha atual</label>
+            <input
+              id="perfil-senha-atual"
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              value={senhaAtualPerfil}
+              onChange={(e) => setSenhaAtualPerfil(e.target.value)}
+              required
+            />
+          </div>
+        )}
         <div className="field">
           <label className="field-label" htmlFor="perfil-grau">Grau</label>
           <select id="perfil-grau" className="select" value={perfil.grau} onChange={(e) => setPerfil({ ...perfil, grau: e.target.value })} required>
@@ -140,12 +206,33 @@ export const ContaView: React.FC<ContaViewProps> = ({
       {ehDono && (
         <section className="card">
           <h2 className="card-title">Participantes do preparo</h2>
-          {erroMembros && <div className="alert-box alert-danger" role="alert">{erroMembros}</div>}
+          <form onSubmit={adicionarParticipante} noValidate>
+            <div className="field">
+              <label className="field-label" htmlFor="participante-email">E-mail da pessoa</label>
+              <input
+                id="participante-email"
+                className="input"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={emailParticipante}
+                onChange={(e) => setEmailParticipante(e.target.value)}
+                aria-describedby={erroMembros ? "membros-erro" : undefined}
+                required
+              />
+            </div>
+            {erroMembros && <div id="membros-erro" className="alert-box alert-danger" role="alert">{erroMembros}</div>}
+            <button type="submit" className="btn btn-primary" disabled={enviandoParticipante || !emailParticipante.trim()}>
+              Adicionar participante
+            </button>
+          </form>
           {pendentesDoPreparo.length === 0 && <p className="muted">Nenhum pedido aguardando.</p>}
           {membros.map((m) => (
             <div key={m.usuarioId} className="list-row static">
               <span>
-                <strong>{m.nome}</strong> <span className="muted">· {m.login} · {m.papel === "dono" ? "dono" : m.situacao}</span>
+                <strong>{m.nome}</strong> <span className="muted">· {m.email ?? m.login} · {m.papel === "dono" ? "dono" : m.situacao}</span>
               </span>
               {m.papel !== "dono" && m.situacao !== "aprovado" && (
                 <button type="button" className="btn btn-primary" aria-label={`Aprovar ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "aprovado"), `${m.nome} aprovado(a).`)}>

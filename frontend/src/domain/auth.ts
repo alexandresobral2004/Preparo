@@ -27,13 +27,26 @@ export function filtrarPorSituacao(lista: readonly Usuario[], filtro: FiltroSitu
   return filtro === "todos" ? [...lista] : lista.filter((u) => u.situacao === filtro);
 }
 
-/** Mesmo padrão do backend (schemas.py); logins com esse prefixo são de contas anonimizadas. */
-const REGRA_LOGIN = /^[A-Za-z0-9._-]{3,64}$/;
-const PREFIXO_REMOVIDO = "removido-";
+/** Mesma regra do backend (schemas.py): e-mail é guardado sem espaços e em minúsculas. */
+export function normalizarEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
-export function validarLogin(login: string): string | null {
-  if (login.toLowerCase().startsWith(PREFIXO_REMOVIDO)) return "Esse login é reservado.";
-  if (!REGRA_LOGIN.test(login)) return "Use só letras sem acento, números, ponto, hífen e sublinhado (3 a 64).";
+const REGRA_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const EMAIL_MAX = 254;
+const PREFIXO_RESERVADO = "removido-"; // espelha PREFIXO_USUARIO_REMOVIDO do backend
+
+export function validarEmail(email: string): string | null {
+  const e = normalizarEmail(email);
+  if (e.length > EMAIL_MAX || !REGRA_EMAIL.test(e)) return "Informe um e-mail válido.";
+  if (e.startsWith(PREFIXO_RESERVADO)) return "Esse e-mail é reservado.";
+  return null;
+}
+
+/** Entrar: só confere se os campos foram preenchidos; o formato do login fica com o servidor. */
+export function validarEntrar(login: string, senha: string): string | null {
+  if (!login.trim()) return "Informe seu e-mail ou login.";
+  if (!senha) return "Informe sua senha.";
   return null;
 }
 

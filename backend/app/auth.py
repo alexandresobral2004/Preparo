@@ -83,8 +83,15 @@ def limpar_falhas(login: str | None = None) -> None:
 
 
 def autenticar(conn: sqlite3.Connection, login: str, senha: str) -> sqlite3.Row | None:
-    """Devolve o usuário se login e senha conferem (qualquer situação); senão None."""
-    row = conn.execute("SELECT * FROM usuarios WHERE login = ?", (login.strip(),)).fetchone()
+    """Devolve o usuário se login e senha conferem (qualquer situação); senão None.
+
+    Identificador com "@" é e-mail; sem "@" é o login antigo. Uma só regra, nos dois casos hash verificado.
+    """
+    identificador = login.strip()
+    if "@" in identificador:
+        row = conn.execute("SELECT * FROM usuarios WHERE email = ?", (identificador.lower(),)).fetchone()
+    else:
+        row = conn.execute("SELECT * FROM usuarios WHERE login = ?", (identificador,)).fetchone()
     senha_ok = verificar_senha(senha, row["senha_hash"] if row else _HASH_FALSO)
     if row is None or not senha_ok:
         return None
@@ -138,6 +145,7 @@ def usuario_publico(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
         "login": row["login"],
+        "email": row["email"],
         "nome": row["nome"],
         "papel": row["papel"],
         "situacao": row["situacao"],
@@ -173,9 +181,10 @@ def garantir_admin_inicial() -> None:
     with db_session() as conn:
         if conn.execute("SELECT 1 FROM usuarios LIMIT 1").fetchone():
             return
+        email = login.lower() if "@" in login else None
         cur = conn.execute(
-            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at) "
-            "VALUES (?, ?, ?, 'admin', 'ativo', ?)",
-            (login, login, hash_senha(senha), now_iso()),
+            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at, email) "
+            "VALUES (?, ?, ?, 'admin', 'ativo', ?, ?)",
+            (login, login, hash_senha(senha), now_iso(), email),
         )
         adotar_dados_legados(conn, cur.lastrowid)

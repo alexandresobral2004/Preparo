@@ -33,8 +33,14 @@ def _client(monkeypatch, tmp_path: Path, **env: str) -> TestClient:
     return TestClient(create_app(dist_dir=tmp_path / "sem_dist"), base_url=base)
 
 
+def _mail(nome: str) -> str:
+    """Identidade de teste: contas novas entram pelo e-mail derivado do nome."""
+    return f"{nome}@x.com"
+
+
 def _login(client: TestClient, login: str, senha: str):
-    return client.post("/api/auth/login", json={"login": login, "senha": senha})
+    identificador = login if login.lower() == ADMIN["login"] else _mail(login)
+    return client.post("/api/auth/login", json={"login": identificador, "senha": senha})
 
 
 def test_hash_nao_guarda_senha_em_texto_puro_e_verifica() -> None:
@@ -94,11 +100,13 @@ def test_bloqueia_apos_cinco_senhas_erradas(monkeypatch, tmp_path: Path) -> None
 def test_admin_cria_usuario_e_usuario_comum_nao_gerencia(monkeypatch, tmp_path: Path) -> None:
     with _client(monkeypatch, tmp_path) as admin_client:
         _login(admin_client, **ADMIN)
-        novo = {"login": "maria", "nome": "Maria", "senha": "maria-senha-1", "papel": "usuario", **GRAU_NUCLEO}
+        novo = {"email": "maria@x.com", "nome": "Maria", "senha": "maria-senha-1", "papel": "usuario", **GRAU_NUCLEO}
         criado = admin_client.post("/api/usuarios", json=novo)
         assert criado.status_code == 201
         assert "senha" not in criado.json() and "senhaHash" not in criado.json()
-        assert admin_client.post("/api/usuarios", json=novo).status_code == 409  # login repetido
+        repetido = admin_client.post("/api/usuarios", json=novo)
+        assert repetido.status_code == 409  # e-mail repetido
+        assert repetido.json()["detail"] == "Este e-mail já está em uso por outra conta."
 
         with TestClient(admin_client.app) as comum:
             assert _login(comum, "maria", "maria-senha-1").status_code == 200
@@ -110,7 +118,7 @@ def test_admin_cria_usuario_e_usuario_comum_nao_gerencia(monkeypatch, tmp_path: 
 def test_senha_curta_e_papel_invalido_sao_rejeitados(monkeypatch, tmp_path: Path) -> None:
     with _client(monkeypatch, tmp_path) as client:
         _login(client, **ADMIN)
-        base = {"login": "joao", "nome": "João", "senha": "joao-senha-1", "papel": "usuario", **GRAU_NUCLEO}
+        base = {"email": "joao@x.com", "nome": "João", "senha": "joao-senha-1", "papel": "usuario", **GRAU_NUCLEO}
         assert client.post("/api/usuarios", json={**base, "senha": "curta"}).status_code == 422
         assert client.post("/api/usuarios", json={**base, "papel": "root"}).status_code == 422
 
@@ -141,7 +149,7 @@ def test_admin_nao_rebaixa_nem_desativa_a_si_mesmo_mesmo_com_outro_admin(monkeyp
         meu_id = _login(client, **ADMIN).json()["usuario"]["id"]
         segundo = client.post(
             "/api/usuarios",
-            json={"login": "outro_admin", "nome": "Outro", "senha": "outro-senha-1", "papel": "admin", **GRAU_NUCLEO},
+            json={"email": "outro_admin@x.com", "nome": "Outro", "senha": "outro-senha-1", "papel": "admin", **GRAU_NUCLEO},
         )
         assert segundo.status_code == 201
         assert client.patch(f"/api/usuarios/{meu_id}", json={"papel": "usuario"}).status_code == 400
@@ -157,7 +165,7 @@ def test_usuario_desativado_perde_a_sessao_e_nao_loga(monkeypatch, tmp_path: Pat
         _login(admin_client, **ADMIN)
         uid = admin_client.post(
             "/api/usuarios",
-            json={"login": "ana", "nome": "Ana", "senha": "ana-senha-123", "papel": "usuario", **GRAU_NUCLEO},
+            json={"email": "ana@x.com", "nome": "Ana", "senha": "ana-senha-123", "papel": "usuario", **GRAU_NUCLEO},
         ).json()["id"]
         with TestClient(admin_client.app) as ana:
             _login(ana, "ana", "ana-senha-123")
@@ -172,7 +180,7 @@ def test_admin_redefine_senha_de_outro_usuario(monkeypatch, tmp_path: Path) -> N
         _login(client, **ADMIN)
         uid = client.post(
             "/api/usuarios",
-            json={"login": "leo", "nome": "Leo", "senha": "leo-senha-123", "papel": "usuario", **GRAU_NUCLEO},
+            json={"email": "leo@x.com", "nome": "Leo", "senha": "leo-senha-123", "papel": "usuario", **GRAU_NUCLEO},
         ).json()["id"]
         assert client.patch(f"/api/usuarios/{uid}", json={"senha": "leo-nova-123"}).status_code == 200
         with TestClient(client.app) as leo:
@@ -206,8 +214,8 @@ def test_cors_so_libera_origens_configuradas(monkeypatch, tmp_path: Path) -> Non
         assert "access-control-allow-origin" not in outra.headers
 
 
-def _cadastro(client: TestClient, login: str, senha: str = "cadastro-123", nome: str = "Pessoa"):
-    return client.post("/api/auth/cadastro", json={"login": login, "nome": nome, "senha": senha})
+def _cadastro(client: TestClient, nome_teste: str, senha: str = "cadastro-123", nome: str = "Pessoa"):
+    return client.post("/api/auth/cadastro", json={"email": _mail(nome_teste), "nome": nome, "senha": senha})
 
 
 def test_cadastro_fica_pendente_e_so_entra_depois_de_aprovado(monkeypatch, tmp_path: Path) -> None:
@@ -215,7 +223,7 @@ def test_cadastro_fica_pendente_e_so_entra_depois_de_aprovado(monkeypatch, tmp_p
         _login(admin, **ADMIN)
         res = _cadastro(novo, "carla", nome="Carla")
         assert res.status_code == 201
-        assert "senha" not in res.text and "hash" not in res.text.lower()
+        assert '"senha' not in res.text and "hash" not in res.text.lower()  # a mensagem fala em "senha", sem expor campo
         assert novo.get("/api/preparos").status_code == 401  # cadastro não abre sessão
 
         pendente = _login(novo, "carla", "cadastro-123")
@@ -224,36 +232,34 @@ def test_cadastro_fica_pendente_e_so_entra_depois_de_aprovado(monkeypatch, tmp_p
         assert _login(novo, "carla", "senha-errada-1").status_code == 401  # senha errada continua genérica
 
         lista = admin.get("/api/usuarios").json()
-        carla = next(u for u in lista if u["login"] == "carla")
+        carla = next(u for u in lista if u["email"] == _mail("carla"))
         assert carla["situacao"] == "pendente"
         assert admin.patch(f"/api/usuarios/{carla['id']}", json={"situacao": "ativo"}).status_code == 200
         assert _login(novo, "carla", "cadastro-123").status_code == 200
 
 
-def test_cadastro_rejeita_login_repetido_senha_curta_e_excesso_de_pendentes(monkeypatch, tmp_path: Path) -> None:
+def test_cadastro_rejeita_senha_curta_e_excesso_de_pendentes(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(auth, "MAX_PENDENTES", 2)
     with _client(monkeypatch, tmp_path) as client:
-        assert _cadastro(client, "admin").status_code == 409  # login já existe
         assert _cadastro(client, "dani", senha="curta").status_code == 422
         assert _cadastro(client, "pa1").status_code == 201
         assert _cadastro(client, "pa2").status_code == 201
         assert _cadastro(client, "pa3").status_code == 429  # limite de contas pendentes
-        assert _cadastro(client, "PA1").status_code == 409  # login não diferencia maiúsculas
 
 
 def test_cadastro_nao_deixa_escolher_papel(monkeypatch, tmp_path: Path) -> None:
     with _client(monkeypatch, tmp_path) as admin, TestClient(_client(monkeypatch, tmp_path).app) as novo:
         novo.post(
             "/api/auth/cadastro",
-            json={"login": "intruso", "nome": "X", "senha": "intruso-123", "papel": "admin", "situacao": "ativo"},
+            json={"email": "intruso@x.com", "nome": "X", "senha": "intruso-123", "papel": "admin", "situacao": "ativo"},
         )
         _login(admin, **ADMIN)
-        u = next(u for u in admin.get("/api/usuarios").json() if u["login"] == "intruso")
+        u = next(u for u in admin.get("/api/usuarios").json() if u["email"] == "intruso@x.com")
         assert (u["papel"], u["situacao"]) == ("usuario", "pendente")
 
 
 def _cadastro_completo(client: TestClient, login: str, **extra):
-    corpo = {"login": login, "nome": "Pessoa", "senha": "cadastro-123", "grau": "mestre", "nucleo": "Bendito Filho"}
+    corpo = {"email": _mail(login), "nome": "Pessoa", "senha": "cadastro-123", "grau": "mestre", "nucleo": "Bendito Filho"}
     return client.post("/api/auth/cadastro", json={**corpo, **extra})
 
 
@@ -261,7 +267,7 @@ def test_cadastro_grava_grau_e_nucleo_e_fica_pendente(monkeypatch, tmp_path: Pat
     with _client(monkeypatch, tmp_path) as admin, TestClient(_client(monkeypatch, tmp_path).app) as novo:
         _login(admin, **ADMIN)
         assert _cadastro_completo(novo, "rita", nome="Rita").status_code == 201
-        rita = next(u for u in admin.get("/api/usuarios").json() if u["login"] == "rita")
+        rita = next(u for u in admin.get("/api/usuarios").json() if u["email"] == "rita@x.com")
         assert (rita["situacao"], rita["grau"], rita["nucleo"]) == ("pendente", "mestre", "Bendito Filho")
         assert "senha_hash" not in rita and "senhaHash" not in rita
 
@@ -270,7 +276,7 @@ def test_cadastro_sem_grau_e_nucleo_continua_aceito_para_pwa_antigo(monkeypatch,
     with _client(monkeypatch, tmp_path) as admin, TestClient(_client(monkeypatch, tmp_path).app) as novo:
         _login(admin, **ADMIN)
         assert _cadastro(novo, "velha01").status_code == 201
-        antiga = next(u for u in admin.get("/api/usuarios").json() if u["login"] == "velha01")
+        antiga = next(u for u in admin.get("/api/usuarios").json() if u["email"] == _mail("velha01"))
         assert (antiga["grau"], antiga["nucleo"]) == ("", "")
 
 
@@ -287,12 +293,12 @@ def test_erro_de_validacao_vem_em_portugues_por_campo_sem_ecoar_a_senha(monkeypa
     with _client(monkeypatch, tmp_path) as client:
         res = client.post(
             "/api/auth/cadastro",
-            json={"login": "a b", "nome": "Pessoa", "senha": "abc-9"},
+            json={"email": "a b", "nome": "Pessoa", "senha": "abc-9"},
         )
         assert res.status_code == 422
         detalhe = res.json()["detail"]
         assert isinstance(detalhe, str)
-        assert "Senha" in detalhe and "Login" in detalhe
+        assert "Senha" in detalhe and "Informe um e-mail válido." in detalhe
         assert "abc-9" not in res.text
         assert "input" not in res.text and "pydantic" not in res.text.lower()
 
@@ -305,7 +311,7 @@ def test_cadastro_limita_cinco_por_ip_a_cada_quinze_minutos(monkeypatch, tmp_pat
         # o último IP do X-Forwarded-For é o que o proxy acrescenta: outro cliente segue livre
         outro = client.post(
             "/api/auth/cadastro",
-            json={"login": "outra01", "nome": "Outra", "senha": "cadastro-123"},
+            json={"email": "outra01@x.com", "nome": "Outra", "senha": "cadastro-123"},
             headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.9"},
         )
         assert outro.status_code == 201
@@ -316,13 +322,13 @@ def test_limite_de_cadastros_nao_se_burla_trocando_o_primeiro_ip_do_cabecalho(mo
         for i in range(5):
             res = client.post(
                 "/api/auth/cadastro",
-                json={"login": f"rot{i:02d}", "nome": "Pessoa", "senha": "cadastro-123"},
+                json={"email": f"rot{i:02d}@x.com", "nome": "Pessoa", "senha": "cadastro-123"},
                 headers={"X-Forwarded-For": f"198.51.100.{i + 1}, 203.0.113.7"},
             )
             assert res.status_code == 201
         sexto = client.post(
             "/api/auth/cadastro",
-            json={"login": "rot09", "nome": "Pessoa", "senha": "cadastro-123"},
+            json={"email": "rot09@x.com", "nome": "Pessoa", "senha": "cadastro-123"},
             headers={"X-Forwarded-For": "192.0.2.99, 203.0.113.7"},
         )
         assert sexto.status_code == 429
@@ -345,17 +351,17 @@ def test_me_traz_pendentes_so_para_admin(monkeypatch, tmp_path: Path) -> None:
 def _novo_usuario(client: TestClient, login: str):
     return client.post(
         "/api/usuarios",
-        json={"login": login, "nome": login.title(), "senha": f"{login}-senha-1", "papel": "usuario", **GRAU_NUCLEO},
+        json={"email": _mail(login), "nome": login.title(), "senha": f"{login}-senha-1", "papel": "usuario", **GRAU_NUCLEO},
     )
 
 
 def test_admin_cria_usuario_com_grau_e_nucleo_obrigatorios(monkeypatch, tmp_path: Path) -> None:
     with _client(monkeypatch, tmp_path) as client:
         _login(client, **ADMIN)
-        base = {"login": "dani", "nome": "Dani", "senha": "dani-senha-1", "papel": "usuario"}
+        base = {"email": "dani@x.com", "nome": "Dani", "senha": "dani-senha-1", "papel": "usuario"}
         assert client.post("/api/usuarios", json=base).status_code == 422  # sem grau nem núcleo
         assert client.post("/api/usuarios", json={**base, **GRAU_NUCLEO, "grau": ""}).status_code == 422
-        assert client.post("/api/usuarios", json={**base, **GRAU_NUCLEO, "login": "removido-3"}).status_code == 422
+        assert client.post("/api/usuarios", json={**base, **GRAU_NUCLEO, "email": "removido-3@x.com"}).status_code == 422
         criado = client.post("/api/usuarios", json={**base, **GRAU_NUCLEO})
         assert criado.status_code == 201
         assert (criado.json()["grau"], criado.json()["nucleo"]) == ("socio", "Bendito Filho")
@@ -426,7 +432,7 @@ def test_excluir_com_vinculo_anonimiza_e_mantem_o_historico(monkeypatch, tmp_pat
                 assert _login(nova_sessao, "bia", "bia-senha-1").status_code == 401
             lista = admin.get("/api/usuarios").json()
             assert all(u["id"] != uid for u in lista)
-            assert all(u["login"] != "bia" and "bia" not in u["nome"].lower() for u in lista)
+            assert all(u["email"] != "bia@x.com" and "bia" not in u["nome"].lower() for u in lista)
 
             preparos = admin.get("/api/preparos").json()
             assert preparos and preparos[0]["donoNome"] == "Usuário removido"

@@ -32,10 +32,10 @@ def _equipe(monkeypatch, tmp_path: Path):
     with TestClient(app) as boot:  # sobe o app e cria o admin
         boot.post("/api/auth/login", json=ADMIN)
         for login, nome in (("maria", "Maria"), ("joao", "João")):
-            r = boot.post("/api/usuarios", json={"login": login, "nome": nome, "senha": f"{login}-senha-1", "papel": "usuario", "grau": "socio", "nucleo": "Bendito Filho"})
+            r = boot.post("/api/usuarios", json={"email": f"{login}@x.com", "nome": nome, "senha": f"{login}-senha-1", "papel": "usuario", "grau": "socio", "nucleo": "Bendito Filho"})
             assert r.status_code == 201
-    maria = _entrar(app, "maria", "maria-senha-1")
-    joao = _entrar(app, "joao", "joao-senha-1")
+    maria = _entrar(app, "maria@x.com", "maria-senha-1")
+    joao = _entrar(app, "joao@x.com", "joao-senha-1")
     prep = maria.post("/api/preparos", json={"nome": "Bendito Filho"})
     assert prep.status_code == 201
     return maria, joao, prep.json()["id"]

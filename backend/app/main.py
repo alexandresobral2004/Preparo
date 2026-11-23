@@ -28,6 +28,7 @@ async def lifespan(_app: FastAPI):
 
 _ROTULOS_CAMPOS = {
     "login": "Login",
+    "email": "E-mail",
     "nome": "Nome",
     "senha": "Senha",
     "novaSenha": "Nova senha",

@@ -194,7 +194,7 @@ _COLUNAS_NOVAS: dict[str, list[tuple[str, str]]] = {
     ],
     "lembretes": [("preparo_id", "TEXT")],
     "panelas": [("peso_com_agua_kg", "REAL")],
-    "usuarios": [("grau", "TEXT NOT NULL DEFAULT ''"), ("nucleo", "TEXT NOT NULL DEFAULT ''")],
+    "usuarios": [("grau", "TEXT NOT NULL DEFAULT ''"), ("nucleo", "TEXT NOT NULL DEFAULT ''"), ("email", "TEXT")],
 }
 
 
@@ -205,6 +205,12 @@ def _garantir_colunas(conn: sqlite3.Connection) -> None:
         for nome, ddl in colunas:
             if nome not in existentes:
                 conn.execute(f"ALTER TABLE {tabela} ADD COLUMN {nome} {ddl}")
+    # E-mail como identificador: contas antigas cujo login já é um e-mail ganham o mesmo valor.
+    conn.execute(
+        "UPDATE usuarios SET email = lower(trim(login)) "
+        "WHERE email IS NULL AND login LIKE '%@%' AND login NOT LIKE 'removido-%'"
+    )
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email COLLATE NOCASE)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_registros_preparo ON registros(preparo_id, excluido, data DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_lembretes_preparo ON lembretes(preparo_id)")
 

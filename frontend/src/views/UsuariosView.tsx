@@ -4,9 +4,10 @@ import { ConfirmButton } from "../components/ConfirmButton";
 import {
   GRAUS,
   filtrarPorSituacao,
+  normalizarEmail,
   ordenarUsuarios,
   rotuloGrau,
-  validarLogin,
+  validarEmail,
   validarNovaSenha,
   type FiltroSituacao,
 } from "../domain/auth";
@@ -154,7 +155,7 @@ export const UsuariosView: React.FC<UsuariosViewProps> = ({ usuarioLogado, onVol
                   <span>
                     <strong>{u.nome}</strong>
                     <span className="muted" style={{ display: "block" }}>
-                      {u.login} · {rotuloGrau(u.grau)} · {u.nucleo || "Sem núcleo"}
+                      {u.email ?? u.login} · {rotuloGrau(u.grau)} · {u.nucleo || "Sem núcleo"}
                     </span>
                   </span>
                   <span className="muted">
@@ -194,7 +195,7 @@ interface FormularioUsuarioProps {
 
 const FormularioUsuario: React.FC<FormularioUsuarioProps> = ({ alvo, usuarioLogado, onCancelar, onGravado, onExcluido }) => {
   const [nome, setNome] = useState(alvo?.nome ?? "");
-  const [login, setLogin] = useState("");
+  const [email, setEmail] = useState(alvo?.email ?? "");
   const [grau, setGrau] = useState(alvo?.grau ?? "");
   const [nucleo, setNucleo] = useState(alvo?.nucleo ?? "Bendito Filho");
   const [papel, setPapel] = useState<Usuario["papel"]>(alvo?.papel ?? "usuario");
@@ -215,9 +216,11 @@ const FormularioUsuario: React.FC<FormularioUsuarioProps> = ({ alvo, usuarioLoga
     if (!nome.trim()) return setErro("Informe o nome.");
     if (!grau) return setErro("Escolha o grau.");
     if (!nucleo.trim()) return setErro("Informe o núcleo.");
-    if (alvo === null) {
-      const problemaLogin = validarLogin(login.trim());
-      if (problemaLogin) return setErro(problemaLogin);
+    // Na criação o e-mail é obrigatório; na edição, em branco significa "não mexer" (conta antiga sem e-mail).
+    const emailInformado = email.trim() !== "";
+    if (alvo === null || emailInformado) {
+      const problemaEmail = validarEmail(email);
+      if (problemaEmail) return setErro(problemaEmail);
     }
     if (querSenha) {
       const problema = validarNovaSenha(senha, confirma);
@@ -226,10 +229,11 @@ const FormularioUsuario: React.FC<FormularioUsuarioProps> = ({ alvo, usuarioLoga
     setEnviando(true);
     try {
       if (alvo === null) {
-        await criarUsuario({ login: login.trim(), nome: nome.trim(), grau, nucleo: nucleo.trim(), senha, papel });
+        await criarUsuario({ email: normalizarEmail(email), nome: nome.trim(), grau, nucleo: nucleo.trim(), senha, papel });
         onGravado("Usuário criado.");
       } else {
         const campos: CamposUsuario = { nome: nome.trim(), grau, nucleo: nucleo.trim(), papel, situacao };
+        if (emailInformado) campos.email = normalizarEmail(email);
         if (redefinir) campos.senha = senha;
         await editarUsuario(alvo.id, campos);
         onGravado("Alterações salvas.");
@@ -254,7 +258,7 @@ const FormularioUsuario: React.FC<FormularioUsuarioProps> = ({ alvo, usuarioLoga
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-      <form className="card" onSubmit={enviar}>
+      <form className="card" onSubmit={enviar} noValidate>
         <h2 className="card-title">{alvo === null ? "Novo usuário" : `Editar ${alvo.nome}`}</h2>
         {erro && <div className="alert-box alert-danger" role="alert">{erro}</div>}
 
@@ -264,22 +268,23 @@ const FormularioUsuario: React.FC<FormularioUsuarioProps> = ({ alvo, usuarioLoga
         </div>
 
         <div className="field">
-          <label className="field-label" htmlFor="usr-login">Login</label>
-          {alvo === null ? (
-            <input
-              id="usr-login"
-              className="input"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoComplete="off"
-              maxLength={64}
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              required
-            />
-          ) : (
-            <input id="usr-login" className="input locked" value={alvo.login} readOnly />
+          <label className="field-label" htmlFor="usr-email">E-mail</label>
+          <input
+            id="usr-email"
+            className="input"
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            maxLength={254}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required={alvo === null}
+          />
+          {alvo !== null && !alvo.email && (
+            <p className="muted">Opcional nesta conta antiga: informe um e-mail para ser encontrado por outras pessoas.</p>
           )}
         </div>
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -118,7 +119,9 @@ ModeloNivel = Literal["inicial", "aprendendo", "calibrado"]
 
 
 class LoginIn(BaseModel):
-    login: str = Field(min_length=1, max_length=64)
+    """`login` recebe o e-mail (contas novas) ou o login antigo; o nome do campo não muda por compatibilidade."""
+
+    login: str = Field(min_length=1, max_length=254)
     senha: str = Field(min_length=1, max_length=256)
 
 
@@ -144,18 +147,28 @@ def _login_livre(valor: str) -> str:
     return valor
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def normalizar_email(valor: str) -> str:
+    email = valor.strip().lower()
+    if len(email) > 254 or not _EMAIL_RE.match(email):
+        raise ValueError("Informe um e-mail válido.")
+    return _login_livre(email)
+
+
 class UsuarioNovo(BaseModel):
-    login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    email: str
     nome: str = Field(min_length=1, max_length=120)
     grau: GRAUS
     nucleo: str
     senha: str = Field(min_length=SENHA_MIN, max_length=256)
     papel: Literal["admin", "usuario"] = "usuario"
 
-    @field_validator("login")
+    @field_validator("email")
     @classmethod
-    def _login_nao_reservado(cls, v: str) -> str:
-        return _login_livre(v)
+    def _email_valido(cls, v: str) -> str:
+        return normalizar_email(v)
 
     @field_validator("nome")
     @classmethod
@@ -171,16 +184,16 @@ class UsuarioNovo(BaseModel):
 class CadastroIn(BaseModel):
     """Autocadastro. Grau e núcleo são obrigatórios no formulário novo; o PWA antigo ainda pode omiti-los."""
 
-    login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    email: str
     nome: str = Field(min_length=1, max_length=120)
     grau: GRAUS | None = None
     nucleo: str | None = None
     senha: str = Field(min_length=SENHA_MIN, max_length=256)
 
-    @field_validator("login")
+    @field_validator("email")
     @classmethod
-    def _login_nao_reservado(cls, v: str) -> str:
-        return _login_livre(v)
+    def _email_valido(cls, v: str) -> str:
+        return normalizar_email(v)
 
     @field_validator("nome")
     @classmethod
@@ -200,6 +213,7 @@ class UsuarioEdicao(BaseModel):
     papel: Literal["admin", "usuario"] | None = None
     situacao: Literal["pendente", "ativo", "inativo"] | None = None
     senha: str | None = Field(default=None, min_length=SENHA_MIN, max_length=256)
+    email: str | None = None
 
     @field_validator("nome")
     @classmethod
@@ -210,6 +224,11 @@ class UsuarioEdicao(BaseModel):
     @classmethod
     def _nucleo_limpo(cls, v: str | None) -> str | None:
         return None if v is None else _texto(v, 80, "O núcleo")
+
+    @field_validator("email")
+    @classmethod
+    def _email_valido(cls, v: str | None) -> str | None:
+        return None if v is None else normalizar_email(v)
 
 
 class PerfilEdicao(BaseModel):
@@ -218,6 +237,8 @@ class PerfilEdicao(BaseModel):
     nome: str | None = Field(default=None, min_length=1, max_length=120)
     grau: GRAUS | None = None
     nucleo: str | None = None
+    email: str | None = None
+    senhaAtual: str | None = Field(default=None, max_length=256)
 
     @field_validator("nome")
     @classmethod
@@ -229,6 +250,11 @@ class PerfilEdicao(BaseModel):
     def _nucleo_limpo(cls, v: str | None) -> str | None:
         return None if v is None else _texto(v, 80, "O núcleo")
 
+    @field_validator("email")
+    @classmethod
+    def _email_valido(cls, v: str | None) -> str | None:
+        return None if v is None else normalizar_email(v)
+
 
 class PreparoNovo(BaseModel):
     nome: str = Field(min_length=1, max_length=80)
@@ -236,3 +262,12 @@ class PreparoNovo(BaseModel):
 
 class MembroSituacaoIn(BaseModel):
     situacao: Literal["aprovado", "recusado"]
+
+
+class MembroNovoIn(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def _email_valido(cls, v: str) -> str:
+        return normalizar_email(v)

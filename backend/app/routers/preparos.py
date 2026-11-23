@@ -8,11 +8,16 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from .. import auth
 from ..auth import exigir_login
 from ..database import db_session, now_iso
-from ..schemas import MembroSituacaoIn, PreparoNovo
+from ..schemas import MembroNovoIn, MembroSituacaoIn, PreparoNovo
 
 router = APIRouter(prefix="/api/preparos", tags=["preparos"], dependencies=[Depends(exigir_login)])
+
+_MSG_NAO_ENCONTRADO = (
+    "Não encontramos uma pessoa cadastrada e ativa com esse e-mail. Confira o e-mail ou peça que ela se cadastre."
+)
 
 
 def _exigir_dono(conn: sqlite3.Connection, preparo_id: str, usuario_id: int) -> None:
@@ -88,7 +93,7 @@ def solicitar(preparo_id: str, usuario: dict[str, Any] = Depends(exigir_login)) 
             )
             return {"situacao": "pendente"}
         if atual["situacao"] == "recusado":
-            raise HTTPException(status_code=409, detail="O dono do preparo recusou o seu pedido.")
+            raise HTTPException(status_code=409, detail="O dono do preparo não liberou sua entrada.")
         return {"situacao": atual["situacao"]}
 
 
@@ -98,7 +103,7 @@ def listar_membros(preparo_id: str, usuario: dict[str, Any] = Depends(exigir_log
         _exigir_dono(conn, preparo_id, usuario["id"])
         rows = conn.execute(
             """
-            SELECT m.usuario_id, u.nome, u.login, m.papel, m.situacao
+            SELECT m.usuario_id, u.nome, u.login, u.email, m.papel, m.situacao
             FROM preparo_membros m JOIN usuarios u ON u.id = m.usuario_id
             WHERE m.preparo_id = ?
             ORDER BY CASE m.papel WHEN 'dono' THEN 0 ELSE 1 END, u.nome COLLATE NOCASE
@@ -110,11 +115,56 @@ def listar_membros(preparo_id: str, usuario: dict[str, Any] = Depends(exigir_log
             "usuarioId": r["usuario_id"],
             "nome": r["nome"],
             "login": r["login"],
+            "email": r["email"],
             "papel": r["papel"],
             "situacao": r["situacao"],
         }
         for r in rows
     ]
+
+
+@router.post("/{preparo_id}/membros")
+def adicionar_membro(
+    preparo_id: str,
+    body: MembroNovoIn,
+    usuario: dict[str, Any] = Depends(exigir_login),
+) -> dict[str, Any]:
+    """Dono adiciona uma pessoa cadastrada e ativa pelo e-mail: ela entra na hora, já aprovada."""
+    chave = f"membro:{usuario['id']}"
+    with db_session() as conn:
+        _exigir_dono(conn, preparo_id, usuario["id"])
+        if auth.bloqueado(chave):
+            raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 15 minutos e tente de novo.")
+        pessoa = conn.execute(
+            "SELECT id, nome FROM usuarios WHERE email = ? AND situacao = 'ativo'", (body.email,)
+        ).fetchone()
+        if pessoa is None:
+            auth.registrar_falha(chave)
+            raise HTTPException(status_code=404, detail=_MSG_NAO_ENCONTRADO)
+        atual = conn.execute(
+            "SELECT papel, situacao FROM preparo_membros WHERE preparo_id = ? AND usuario_id = ?",
+            (preparo_id, pessoa["id"]),
+        ).fetchone()
+        if atual is None:
+            try:
+                conn.execute(
+                    "INSERT INTO preparo_membros (preparo_id, usuario_id, papel, situacao, created_at) "
+                    "VALUES (?, ?, 'membro', 'aprovado', ?)",
+                    (preparo_id, pessoa["id"], now_iso()),
+                )
+            except sqlite3.IntegrityError:
+                pass  # corrida: outra requisição inseriu a mesma linha depois da checagem; relê abaixo
+            atual = conn.execute(
+                "SELECT papel, situacao FROM preparo_membros WHERE preparo_id = ? AND usuario_id = ?",
+                (preparo_id, pessoa["id"]),
+            ).fetchone()
+        papel = atual["papel"]
+        if atual["situacao"] != "aprovado":  # pendente ou recusado: o convite explícito do dono aprova
+            conn.execute(
+                "UPDATE preparo_membros SET situacao = 'aprovado' WHERE preparo_id = ? AND usuario_id = ?",
+                (preparo_id, pessoa["id"]),
+            )
+    return {"usuarioId": pessoa["id"], "nome": pessoa["nome"], "papel": papel, "situacao": "aprovado"}
 
 
 @router.patch("/{preparo_id}/membros/{usuario_id}")

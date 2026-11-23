@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { cadastrar, entrar } from "../api/auth";
-import { GRAUS, validarLogin, validarNovaSenha } from "../domain/auth";
+import { GRAUS, normalizarEmail, validarEmail, validarEntrar, validarNovaSenha } from "../domain/auth";
 import type { Usuario } from "../types";
 
 interface LoginViewProps {
@@ -10,6 +10,8 @@ interface LoginViewProps {
 export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
   const [login, setLogin] = useState("");
+  const [email, setEmail] = useState("");
+  const [erroEmail, setErroEmail] = useState("");
   const [nome, setNome] = useState("");
   const [grau, setGrau] = useState("");
   const [nucleo, setNucleo] = useState("Bendito Filho");
@@ -23,6 +25,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
   const trocarModo = (novo: "entrar" | "cadastrar") => {
     setModo(novo);
     setErro("");
+    setErroEmail("");
     setAviso("");
     setSenha("");
     setConfirmacao("");
@@ -31,10 +34,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro("");
+    setErroEmail("");
     setAviso("");
-    if (modo === "cadastrar") {
-      const problemaLogin = validarLogin(login.trim());
-      if (problemaLogin) return setErro(problemaLogin);
+    if (modo === "entrar") {
+      const problemaEntrar = validarEntrar(login, senha);
+      if (problemaEntrar) return setErro(problemaEntrar);
+    } else {
+      const problemaEmail = validarEmail(email);
+      if (problemaEmail) return setErroEmail(problemaEmail);
       if (!grau) return setErro("Escolha o seu grau.");
       if (!nucleo.trim()) return setErro("Informe o núcleo.");
       const problema = validarNovaSenha(senha, confirmacao);
@@ -45,8 +52,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
       if (modo === "entrar") {
         onEntrou(await entrar(login.trim(), senha));
       } else {
-        const mensagem = await cadastrar({ login: login.trim(), nome: nome.trim(), grau, nucleo: nucleo.trim(), senha });
+        const emailNormalizado = normalizarEmail(email);
+        const mensagem = await cadastrar({ email: emailNormalizado, nome: nome.trim(), grau, nucleo: nucleo.trim(), senha });
         trocarModo("entrar");
+        setLogin(emailNormalizado);
         setAviso(mensagem);
       }
     } catch (err) {
@@ -58,27 +67,56 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
 
   return (
     <div className="auth-screen">
-      <form className="card auth-card" onSubmit={enviar}>
+      <form className="card auth-card" onSubmit={enviar} noValidate>
         <h1 className="card-title">Preparo de Vegetal</h1>
-        <p className="muted">{modo === "entrar" ? "Entre com seu login e senha." : "Crie sua conta para participar."}</p>
+        <p className="muted">{modo === "entrar" ? "Entre com seu e-mail ou login e senha." : "Crie sua conta para participar."}</p>
 
         {aviso && <div className="alert-box alert-warn" role="status">{aviso}</div>}
         {erro && <div className="alert-box alert-danger" role="alert">{erro}</div>}
 
-        <div className="field">
-          <label className="field-label" htmlFor="auth-login">Login</label>
-          <input
-            id="auth-login"
-            className="input"
-            autoComplete="username"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
-            required
-          />
-        </div>
+        {modo === "entrar" ? (
+          <div className="field">
+            <label className="field-label" htmlFor="auth-login">E-mail ou login</label>
+            <input
+              id="auth-login"
+              className="input"
+              type="text"
+              inputMode="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-describedby="auth-login-dica"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              required
+            />
+            <p id="auth-login-dica" className="muted">Contas antigas entram com o login de sempre.</p>
+          </div>
+        ) : (
+          <div className="field">
+            <label className="field-label" htmlFor="auth-email">E-mail</label>
+            <input
+              id="auth-email"
+              className="input"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-describedby={erroEmail ? "auth-email-erro" : undefined}
+              aria-invalid={erroEmail ? true : undefined}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErroEmail("");
+              }}
+              required
+            />
+            {erroEmail && <p id="auth-email-erro" className="alert-box alert-danger" role="alert">{erroEmail}</p>}
+          </div>
+        )}
 
         {modo === "cadastrar" && (
           <div className="field">
@@ -148,7 +186,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
         )}
 
         <button type="submit" className="btn btn-primary" disabled={enviando}>
-          {enviando ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Enviar cadastro"}
+          {enviando ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Criar conta"}
         </button>
         <button type="button" className="btn" onClick={() => trocarModo(modo === "entrar" ? "cadastrar" : "entrar")}>
           {modo === "entrar" ? "Criar conta" : "Já tenho conta"}

@@ -8,13 +8,16 @@ import {
   mesclarRespostaDoRascunho,
   ordenarUsuarios,
   rotuloGrau,
-  validarLogin,
+  normalizarEmail,
+  validarEmail,
+  validarEntrar,
   validarNovaSenha,
 } from "./auth";
 
 const usuario = (id: number, nome: string, situacao: Usuario["situacao"]): Usuario => ({
   id,
   login: `login${id}`,
+  email: null,
   nome,
   papel: "usuario",
   situacao,
@@ -82,25 +85,50 @@ describe("validarNovaSenha", () => {
   });
 });
 
-describe("validarLogin", () => {
-  it("aceita letras sem acento, números, ponto, hífen e sublinhado, de 3 a 64 caracteres", () => {
-    expect(validarLogin("ana.silva_1-x")).toBeNull();
-    expect(validarLogin("abc")).toBeNull();
-    expect(validarLogin("a".repeat(64))).toBeNull();
+describe("normalizarEmail", () => {
+  it("tira espaços das pontas e põe em minúsculas", () => {
+    expect(normalizarEmail(" Ana@X.com ")).toBe("ana@x.com");
+  });
+});
+
+describe("validarEntrar", () => {
+  it("exige e-mail ou login e senha antes de enviar, com a mensagem de cada campo", () => {
+    expect(validarEntrar("", "segredo-1")).toBe("Informe seu e-mail ou login.");
+    expect(validarEntrar("   ", "segredo-1")).toBe("Informe seu e-mail ou login.");
+    expect(validarEntrar("ana", "")).toBe("Informe sua senha.");
   });
 
-  it("recusa acento, espaço, caractere especial, login curto e longo demais com a mesma mensagem", () => {
-    const regra = "Use só letras sem acento, números, ponto, hífen e sublinhado (3 a 64).";
-    expect(validarLogin("João")).toBe(regra);
-    expect(validarLogin("ana silva")).toBe(regra);
-    expect(validarLogin("ana@x")).toBe(regra);
-    expect(validarLogin("ab")).toBe(regra);
-    expect(validarLogin("a".repeat(65))).toBe(regra);
+  it("aceita login ou e-mail preenchido com senha, sem exigir formato de e-mail", () => {
+    expect(validarEntrar("ana", "segredo-1")).toBeNull();
+    expect(validarEntrar("ana@x.com", "x")).toBeNull();
+  });
+});
+
+describe("validarEmail", () => {
+  it("aceita e-mail válido, mesmo com espaços e caixa mista", () => {
+    expect(validarEmail("ana@x.com")).toBeNull();
+    expect(validarEmail(" Ana@X.com ")).toBeNull();
   });
 
-  it("recusa o prefixo reservado de contas anonimizadas, sem diferenciar caixa", () => {
-    expect(validarLogin("removido-x")).toBe("Esse login é reservado.");
-    expect(validarLogin("Removido-7")).toBe("Esse login é reservado.");
+  it("recusa formato incompleto ou com espaço no meio, com a mensagem em português", () => {
+    const mensagem = "Informe um e-mail válido.";
+    expect(validarEmail("ana")).toBe(mensagem);
+    expect(validarEmail("ana@")).toBe(mensagem);
+    expect(validarEmail("ana@x")).toBe(mensagem);
+    expect(validarEmail("a b@x.com")).toBe(mensagem);
+    expect(validarEmail("")).toBe(mensagem);
+    expect(validarEmail("   ")).toBe(mensagem);
+  });
+
+  it("recusa o prefixo reservado 'removido-' de contas anonimizadas, sem diferenciar caixa", () => {
+    expect(validarEmail("removido-1@x.com")).toBe("Esse e-mail é reservado.");
+    expect(validarEmail(" REMOVIDO-1@x.com ")).toBe("Esse e-mail é reservado.");
+    expect(validarEmail("ana@x.com")).toBeNull();
+  });
+
+  it("aceita até 254 caracteres e recusa 255", () => {
+    expect(validarEmail("a".repeat(248) + "@x.com")).toBeNull(); // 254
+    expect(validarEmail("a".repeat(249) + "@x.com")).toBe("Informe um e-mail válido.");
   });
 });
 

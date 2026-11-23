@@ -13,7 +13,7 @@ export async function entrar(login: string, senha: string): Promise<Usuario> {
 }
 
 export interface DadosCadastro {
-  login: string;
+  email: string;
   nome: string;
   grau: string;
   nucleo: string;
@@ -56,7 +56,7 @@ export interface DadosUsuarioNovo extends DadosCadastro {
   papel: Usuario["papel"];
 }
 
-export type CamposUsuario = Partial<Pick<Usuario, "nome" | "grau" | "nucleo" | "papel" | "situacao">> & { senha?: string };
+export type CamposUsuario = Partial<Pick<Usuario, "nome" | "grau" | "nucleo" | "papel" | "situacao" | "email">> & { senha?: string };
 
 export const criarUsuario = (dados: DadosUsuarioNovo) => apiFetch<Usuario>("/api/usuarios", post(dados));
 export const editarUsuario = (id: number, campos: CamposUsuario) => apiFetch<Usuario>(`/api/usuarios/${id}`, patch(campos));
@@ -65,13 +65,19 @@ export const editarUsuario = (id: number, campos: CamposUsuario) => apiFetch<Usu
 export const excluirUsuario = (id: number) =>
   apiFetch<{ anonimizado: boolean }>(`/api/usuarios/${id}`, { method: "DELETE" });
 
-export const editarPerfil = (campos: { nome?: string; grau?: string; nucleo?: string }) =>
+/** Trocar o e-mail exige senhaAtual (o backend recusa com 400 sem ela). */
+export const editarPerfil = (campos: { nome?: string; grau?: string; nucleo?: string; email?: string; senhaAtual?: string }) =>
   apiFetch<Usuario>("/api/auth/perfil", patch(campos));
 
 export const listarPreparos = () => apiFetch<PreparoResumo[]>("/api/preparos");
 export const criarPreparo = (nome: string) => apiFetch<{ id: string; nome: string }>("/api/preparos", post({ nome }));
 export const solicitarEntrada = (id: string) => apiFetch<{ situacao: string }>(`/api/preparos/${id}/solicitar`, post({}));
 export const listarMembros = (id: string) => apiFetch<MembroPreparo[]>(`/api/preparos/${id}/membros`);
+export const adicionarMembro = (preparoId: string, email: string) =>
+  apiFetch<{ usuarioId: number; nome: string; papel: string; situacao: "aprovado" }>(
+    `/api/preparos/${preparoId}/membros`,
+    post({ email })
+  );
 export const decidirMembro = (preparoId: string, usuarioId: number, situacao: "aprovado" | "recusado") =>
   apiFetch<{ situacao: string }>(`/api/preparos/${preparoId}/membros/${usuarioId}`, patch({ situacao }));
 

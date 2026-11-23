@@ -13,7 +13,12 @@ from ..schemas import CadastroIn, LoginIn, PerfilEdicao, TrocaSenhaIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-_MSG_LOGIN_INVALIDO = "Login ou senha inválidos."
+_MSG_LOGIN_INVALIDO = "E-mail, login ou senha inválidos."
+# Igual para cadastro novo e para e-mail já usado: a resposta não revela quem já tem conta.
+_MSG_CADASTRO = (
+    "Cadastro enviado. Se este e-mail ainda não tinha conta, você poderá entrar quando o administrador aprovar. "
+    "Se já tinha, entre com sua senha ou fale com o administrador."
+)
 
 
 def _ip_do_cliente(request: Request) -> str:
@@ -30,6 +35,27 @@ def _ip_do_cliente(request: Request) -> str:
 
 def _contar_pendentes(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM usuarios WHERE situacao = 'pendente'").fetchone()[0]
+
+
+def _chave_troca_email(usuario_id: int) -> str:
+    return f"perfil-email:{usuario_id}"
+
+
+def _checa_troca_de_email(conn: sqlite3.Connection, body: PerfilEdicao, usuario_id: int) -> None:
+    """Exige a senha atual e recusa e-mail de outra conta; senha errada e conflito contam no limite."""
+    chave = _chave_troca_email(usuario_id)
+    if auth.bloqueado(chave):
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 15 minutos e tente de novo.")
+    row = conn.execute("SELECT senha_hash FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+    if not body.senhaAtual or not auth.verificar_senha(body.senhaAtual, row["senha_hash"]):
+        if body.senhaAtual:
+            auth.registrar_falha(chave)  # senha errada conta no limite; campo vazio não é palpite
+        raise HTTPException(status_code=400, detail="Confirme sua senha atual para trocar o e-mail.")
+    if conn.execute(
+        "SELECT 1 FROM usuarios WHERE (email = ? OR login = ?) AND id != ?", (body.email, body.email, usuario_id)
+    ).fetchone():
+        auth.registrar_falha(chave)
+        raise HTTPException(status_code=409, detail="Este e-mail já está em uso por outra conta.")
 
 
 @router.post("/login")
@@ -68,17 +94,21 @@ def cadastro(body: CadastroIn, request: Request) -> dict[str, str]:
     if auth.bloqueado(chave_ip):
         raise HTTPException(status_code=429, detail="Muitos cadastros deste endereço. Aguarde 15 minutos e tente de novo.")
     auth.registrar_falha(chave_ip)  # conta cada tentativa, não só as recusadas
+    senha_hash = auth.hash_senha(body.senha)  # antes da checagem: o tempo de resposta não revela se o e-mail existe
     with db_session() as conn:
-        if conn.execute("SELECT 1 FROM usuarios WHERE login = ?", (body.login,)).fetchone():
-            raise HTTPException(status_code=409, detail="Esse login já está em uso.")
         if _contar_pendentes(conn) >= auth.MAX_PENDENTES:
             raise HTTPException(status_code=429, detail="Há cadastros demais aguardando aprovação. Tente mais tarde.")
-        conn.execute(
-            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at, grau, nucleo) "
-            "VALUES (?, ?, ?, 'usuario', 'pendente', ?, ?, ?)",
-            (body.login, body.nome, auth.hash_senha(body.senha), now_iso(), body.grau or "", body.nucleo or ""),
-        )
-    return {"mensagem": "Cadastro enviado. Você poderá entrar quando o administrador aprovar."}
+        if conn.execute("SELECT 1 FROM usuarios WHERE email = ? OR login = ?", (body.email, body.email)).fetchone():
+            return {"mensagem": _MSG_CADASTRO}  # já existe: não grava nada e responde como um cadastro novo
+        try:
+            conn.execute(
+                "INSERT INTO usuarios (login, email, nome, senha_hash, papel, situacao, created_at, grau, nucleo) "
+                "VALUES (?, ?, ?, ?, 'usuario', 'pendente', ?, ?, ?)",
+                (body.email, body.email, body.nome, senha_hash, now_iso(), body.grau or "", body.nucleo or ""),
+            )
+        except sqlite3.IntegrityError:
+            pass  # corrida: outra requisição gravou o mesmo e-mail depois da checagem; a resposta é a mesma
+    return {"mensagem": _MSG_CADASTRO}
 
 
 @router.post("/logout")
@@ -101,13 +131,19 @@ def me(usuario: dict[str, Any] = Depends(auth.exigir_login)) -> dict[str, Any]:
 
 @router.patch("/perfil")
 def editar_perfil(body: PerfilEdicao, usuario: dict[str, Any] = Depends(auth.exigir_login)) -> dict[str, Any]:
-    """Nome, grau e núcleo de quem está logado. Papel e situação não são alterados aqui."""
+    """Nome, grau, núcleo e e-mail de quem está logado. Papel e situação não são alterados aqui."""
     with db_session() as conn:
+        if body.email is not None:
+            _checa_troca_de_email(conn, body, usuario["id"])
         conn.execute(
-            "UPDATE usuarios SET nome = COALESCE(?, nome), grau = COALESCE(?, grau), nucleo = COALESCE(?, nucleo) "
+            "UPDATE usuarios SET nome = COALESCE(?, nome), grau = COALESCE(?, grau), nucleo = COALESCE(?, nucleo), "
+            "email = COALESCE(?, email), "
+            "login = CASE WHEN ? IS NOT NULL AND instr(login, '@') > 0 THEN ? ELSE login END "
             "WHERE id = ?",
-            (body.nome, body.grau, body.nucleo, usuario["id"]),
+            (body.nome, body.grau, body.nucleo, body.email, body.email, body.email, usuario["id"]),
         )
+        if body.email is not None:
+            auth.limpar_falhas(_chave_troca_email(usuario["id"]))  # troca certa zera as falhas anteriores
         atualizado = conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario["id"],)).fetchone()
         return auth.usuario_publico(atualizado)
 
