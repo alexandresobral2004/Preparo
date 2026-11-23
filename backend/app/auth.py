@@ -62,8 +62,12 @@ def _chave(login: str) -> str:
 
 def bloqueado(login: str) -> bool:
     agora = time.monotonic()
-    recentes = [t for t in _falhas.get(_chave(login), []) if agora - t < JANELA_BLOQUEIO_S]
-    _falhas[_chave(login)] = recentes
+    chave = _chave(login)
+    recentes = [t for t in _falhas.get(chave, []) if agora - t < JANELA_BLOQUEIO_S]
+    if recentes:
+        _falhas[chave] = recentes
+    else:
+        _falhas.pop(chave, None)  # sem tentativas na janela, não guarda a chave (evita crescer sem limite)
     return len(recentes) >= MAX_FALHAS
 
 
@@ -137,6 +141,8 @@ def usuario_publico(row: sqlite3.Row) -> dict[str, Any]:
         "nome": row["nome"],
         "papel": row["papel"],
         "situacao": row["situacao"],
+        "grau": row["grau"],
+        "nucleo": row["nucleo"],
     }
 
 

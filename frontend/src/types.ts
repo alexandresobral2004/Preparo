@@ -1,7 +1,7 @@
 export const TIPOS_PANELA = ["1ª vez", "2ª vez", "3ª vez", "APURO"] as const;
 export type TipoPanela = (typeof TIPOS_PANELA)[number];
 
-export type TabKey = "cabecalho" | "panelas" | "andamento" | "registros" | "calc" | "conta";
+export type TabKey = "cabecalho" | "panelas" | "andamento" | "registros" | "calc" | "conta" | "usuarios";
 
 export type PanelaEstado =
   | "vazia"
@@ -221,6 +221,9 @@ export interface Usuario {
   nome: string;
   papel: "admin" | "usuario";
   situacao: "pendente" | "ativo" | "inativo";
+  /** Valor de GRAUS ("" para usuário antigo sem grau informado). */
+  grau: string;
+  nucleo: string;
 }
 
 export interface PreparoResumo {

@@ -90,6 +90,25 @@ textarea {
   color: var(--brand);
 }
 
+.save-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.save-status.salvando {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.save-status.erro {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
 .sync-dot.offline {
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -815,6 +834,26 @@ button.list-row {
 
 button.list-row:hover {
   border-color: var(--brand);
+}
+
+.usuario-linha {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.usuario-linha {
+  flex-wrap: wrap;
+}
+
+.usuario-linha > .list-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Erro da ação ocupa a linha inteira, logo abaixo da pessoa (visível no celular) */
+.usuario-linha > .alert-box {
+  flex: 1 0 100%;
 }
 
 .list-row.static {

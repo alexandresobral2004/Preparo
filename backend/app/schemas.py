@@ -127,24 +127,107 @@ class TrocaSenhaIn(BaseModel):
     novaSenha: str = Field(min_length=SENHA_MIN, max_length=256)
 
 
+GRAUS = Literal["socio", "instrutivo", "conselho", "mestre"]
+PREFIXO_USUARIO_REMOVIDO = "removido-"  # logins com esse prefixo são de contas anonimizadas
+
+
+def _texto(valor: str, limite: int, campo: str) -> str:
+    texto = valor.strip()
+    if not 1 <= len(texto) <= limite:
+        raise ValueError(f"{campo} deve ter de 1 a {limite} caracteres.")
+    return texto
+
+
+def _login_livre(valor: str) -> str:
+    if valor.lower().startswith(PREFIXO_USUARIO_REMOVIDO):
+        raise ValueError("Esse login é reservado.")
+    return valor
+
+
 class UsuarioNovo(BaseModel):
     login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
     nome: str = Field(min_length=1, max_length=120)
+    grau: GRAUS
+    nucleo: str
     senha: str = Field(min_length=SENHA_MIN, max_length=256)
     papel: Literal["admin", "usuario"] = "usuario"
 
+    @field_validator("login")
+    @classmethod
+    def _login_nao_reservado(cls, v: str) -> str:
+        return _login_livre(v)
+
+    @field_validator("nome")
+    @classmethod
+    def _nome_limpo(cls, v: str) -> str:
+        return _texto(v, 120, "O nome")
+
+    @field_validator("nucleo")
+    @classmethod
+    def _nucleo_limpo(cls, v: str) -> str:
+        return _texto(v, 80, "O núcleo")
+
 
 class CadastroIn(BaseModel):
+    """Autocadastro. Grau e núcleo são obrigatórios no formulário novo; o PWA antigo ainda pode omiti-los."""
+
     login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
     nome: str = Field(min_length=1, max_length=120)
+    grau: GRAUS | None = None
+    nucleo: str | None = None
     senha: str = Field(min_length=SENHA_MIN, max_length=256)
+
+    @field_validator("login")
+    @classmethod
+    def _login_nao_reservado(cls, v: str) -> str:
+        return _login_livre(v)
+
+    @field_validator("nome")
+    @classmethod
+    def _nome_limpo(cls, v: str) -> str:
+        return _texto(v, 120, "O nome")
+
+    @field_validator("nucleo")
+    @classmethod
+    def _nucleo_limpo(cls, v: str | None) -> str | None:
+        return None if v is None else _texto(v, 80, "O núcleo")
 
 
 class UsuarioEdicao(BaseModel):
     nome: str | None = Field(default=None, min_length=1, max_length=120)
+    grau: GRAUS | None = None
+    nucleo: str | None = None
     papel: Literal["admin", "usuario"] | None = None
     situacao: Literal["pendente", "ativo", "inativo"] | None = None
     senha: str | None = Field(default=None, min_length=SENHA_MIN, max_length=256)
+
+    @field_validator("nome")
+    @classmethod
+    def _nome_limpo(cls, v: str | None) -> str | None:
+        return None if v is None else _texto(v, 120, "O nome")
+
+    @field_validator("nucleo")
+    @classmethod
+    def _nucleo_limpo(cls, v: str | None) -> str | None:
+        return None if v is None else _texto(v, 80, "O núcleo")
+
+
+class PerfilEdicao(BaseModel):
+    """Edição do próprio perfil. Papel e situação não aparecem aqui, então são ignorados."""
+
+    nome: str | None = Field(default=None, min_length=1, max_length=120)
+    grau: GRAUS | None = None
+    nucleo: str | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _nome_limpo(cls, v: str | None) -> str | None:
+        return None if v is None else _texto(v, 120, "O nome")
+
+    @field_validator("nucleo")
+    @classmethod
+    def _nucleo_limpo(cls, v: str | None) -> str | None:
+        return None if v is None else _texto(v, 80, "O núcleo")
 
 
 class PreparoNovo(BaseModel):

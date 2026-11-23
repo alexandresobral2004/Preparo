@@ -29,6 +29,7 @@ export const AuthGate: React.FC = () => {
   const [fase, setFase] = useState<Fase>("carregando");
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [preparo, setPreparo] = useState<PreparoResumo | null>(null);
+  const [cadastrosPendentes, setCadastrosPendentes] = useState(0);
 
   const escolherPreparo = useCallback((p: PreparoResumo) => {
     // Os dados em cache são do preparo anterior: só reaproveita se for o mesmo.
@@ -43,8 +44,9 @@ export const AuthGate: React.FC = () => {
 
   /** Depois de autenticado: reabre o último preparo, se ainda participa; senão pede a escolha. */
   const aposAutenticar = useCallback(
-    async (u: Usuario) => {
+    async (u: Usuario, pendentes: number) => {
       setUsuario(u);
+      setCadastrosPendentes(pendentes);
       gravarLocal(LS_KEYS.usuario, u);
       const ultimo = lerLocal<string>(LS_KEYS.preparoAtivo);
       try {
@@ -59,13 +61,22 @@ export const AuthGate: React.FC = () => {
     [escolherPreparo]
   );
 
+  /** Login não devolve a contagem de pendentes; o /me devolve (só para admin). */
+  const aposLogin = useCallback(
+    async (u: Usuario) => {
+      const sessao = await fetchMe().catch(() => null);
+      await aposAutenticar(u, sessao?.cadastrosPendentes ?? 0);
+    },
+    [aposAutenticar]
+  );
+
   useEffect(() => {
     let ativo = true;
     (async () => {
       try {
-        const u = await fetchMe();
+        const sessao = await fetchMe();
         if (!ativo) return;
-        if (u) await aposAutenticar(u);
+        if (sessao) await aposAutenticar(sessao.usuario, sessao.cadastrosPendentes);
         else setFase("login");
       } catch {
         // Sem rede: abre com o último usuário/preparo deste aparelho, usando os dados em cache.
@@ -125,11 +136,23 @@ export const AuthGate: React.FC = () => {
   };
 
   if (fase === "carregando") return <div className="auth-screen"><p className="muted">Carregando...</p></div>;
-  if (fase === "login" || !usuario) return <LoginView onEntrou={(u) => void aposAutenticar(u)} />;
+  if (fase === "login" || !usuario) return <LoginView onEntrou={(u) => void aposLogin(u)} />;
   if (fase === "preparos" || !preparo) {
     return <PreparosView usuario={usuario} onEscolher={escolherPreparo} onSair={() => void aoSair()} />;
   }
   return (
-    <App key={preparo.id} usuario={usuario} preparo={preparo} onTrocarPreparo={aoTrocarPreparo} onSair={() => void aoSair()} />
+    <App
+      key={preparo.id}
+      usuario={usuario}
+      preparo={preparo}
+      cadastrosPendentes={cadastrosPendentes}
+      onCadastrosPendentes={setCadastrosPendentes}
+      onUsuarioAtualizado={(atualizado) => {
+        setUsuario(atualizado);
+        gravarLocal(LS_KEYS.usuario, atualizado);
+      }}
+      onTrocarPreparo={aoTrocarPreparo}
+      onSair={() => void aoSair()}
+    />
   );
 };

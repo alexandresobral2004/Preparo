@@ -12,3 +12,4 @@ backend/tests
 frontend/dist
 frontend/tsconfig.tsbuildinfo
 requisitos.txt
+pdfs

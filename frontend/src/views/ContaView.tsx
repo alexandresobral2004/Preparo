@@ -1,33 +1,41 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  decidirMembro,
-  editarUsuario,
-  listarMembros,
-  listarUsuarios,
-  trocarSenha,
-} from "../api/auth";
-import { validarNovaSenha } from "../domain/auth";
+import { decidirMembro, editarPerfil, listarMembros, trocarSenha } from "../api/auth";
+import { ConfirmButton } from "../components/ConfirmButton";
+import { GRAUS, validarNovaSenha } from "../domain/auth";
 import type { MembroPreparo, PreparoResumo, Usuario } from "../types";
 
 interface ContaViewProps {
   usuario: Usuario;
   preparo: PreparoResumo;
+  cadastrosPendentes: number;
   onTrocarPreparo: () => void;
   onSair: () => void;
+  onAbrirUsuarios: () => void;
+  /** Zera o rascunho de panelas em andamento e começa um preparo novo. */
+  onNovoPreparo: () => void;
+  onUsuarioAtualizado: (usuario: Usuario) => void;
   onNotify: (msg: string, kind?: "error" | "info") => void;
 }
 
-const SITUACAO_USUARIO: Record<Usuario["situacao"], string> = { pendente: "Pendente", ativo: "Ativo", inativo: "Inativo" };
-
-export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocarPreparo, onSair, onNotify }) => {
+export const ContaView: React.FC<ContaViewProps> = ({
+  usuario,
+  preparo,
+  cadastrosPendentes,
+  onTrocarPreparo,
+  onSair,
+  onAbrirUsuarios,
+  onNovoPreparo,
+  onUsuarioAtualizado,
+  onNotify,
+}) => {
   const [atual, setAtual] = useState("");
   const [nova, setNova] = useState("");
   const [confirma, setConfirma] = useState("");
   const [erroSenha, setErroSenha] = useState("");
+  const [perfil, setPerfil] = useState({ nome: usuario.nome, grau: usuario.grau, nucleo: usuario.nucleo });
 
   const [membros, setMembros] = useState<MembroPreparo[]>([]);
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [novaSenhaDe, setNovaSenhaDe] = useState<{ id: number; senha: string } | null>(null);
+  const [erroMembros, setErroMembros] = useState("");
 
   const ehDono = preparo.meuPapel === "dono";
   const ehAdmin = usuario.papel === "admin";
@@ -35,23 +43,25 @@ export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocar
   const carregar = useCallback(async () => {
     try {
       if (ehDono) setMembros(await listarMembros(preparo.id));
-      if (ehAdmin) setUsuarios(await listarUsuarios());
     } catch (err) {
       onNotify((err as Error).message, "error");
     }
-  }, [ehDono, ehAdmin, preparo.id, onNotify]);
+  }, [ehDono, preparo.id, onNotify]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
 
   const agir = async (acao: () => Promise<unknown>, ok: string) => {
+    setErroMembros("");
     try {
       await acao();
       onNotify(ok, "info");
       await carregar();
     } catch (err) {
-      onNotify((err as Error).message, "error");
+      const msg = (err as Error).message;
+      setErroMembros(msg);
+      onNotify(msg, "error");
     }
   };
 
@@ -71,6 +81,20 @@ export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocar
     }
   };
 
+  const salvarPerfil = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!perfil.nome.trim()) return onNotify("Informe o nome.", "error");
+    if (!perfil.grau) return onNotify("Escolha o seu grau.", "error");
+    if (!perfil.nucleo.trim()) return onNotify("Informe o núcleo.", "error");
+    try {
+      const atualizado = await editarPerfil({ nome: perfil.nome.trim(), grau: perfil.grau, nucleo: perfil.nucleo.trim() });
+      onUsuarioAtualizado(atualizado);
+      onNotify("Perfil salvo.", "info");
+    } catch (err) {
+      onNotify((err as Error).message, "error");
+    }
+  };
+
   const pendentesDoPreparo = membros.filter((m) => m.situacao === "pendente");
 
   return (
@@ -85,14 +109,38 @@ export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocar
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <ConfirmButton label="Novo preparo" confirmLabel="Toque para zerar o rascunho" onConfirm={onNovoPreparo} />
           <button type="button" className="btn" onClick={onTrocarPreparo}>Trocar de preparo</button>
           <button type="button" className="btn" onClick={onSair}>Sair</button>
         </div>
       </section>
 
+      <form className="card" onSubmit={salvarPerfil}>
+        <h2 className="card-title">Meu perfil</h2>
+        <div className="field">
+          <label className="field-label" htmlFor="perfil-nome">Nome (aparece nos registros)</label>
+          <input id="perfil-nome" className="input" autoComplete="name" maxLength={120} value={perfil.nome} onChange={(e) => setPerfil({ ...perfil, nome: e.target.value })} required />
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="perfil-grau">Grau</label>
+          <select id="perfil-grau" className="select" value={perfil.grau} onChange={(e) => setPerfil({ ...perfil, grau: e.target.value })} required>
+            <option value="" disabled>Selecione</option>
+            {GRAUS.map((g) => (
+              <option key={g.valor} value={g.valor}>{g.rotulo}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="perfil-nucleo">Núcleo</label>
+          <input id="perfil-nucleo" className="input" autoComplete="off" maxLength={80} value={perfil.nucleo} onChange={(e) => setPerfil({ ...perfil, nucleo: e.target.value })} required />
+        </div>
+        <button type="submit" className="btn btn-primary">Salvar perfil</button>
+      </form>
+
       {ehDono && (
         <section className="card">
           <h2 className="card-title">Participantes do preparo</h2>
+          {erroMembros && <div className="alert-box alert-danger" role="alert">{erroMembros}</div>}
           {pendentesDoPreparo.length === 0 && <p className="muted">Nenhum pedido aguardando.</p>}
           {membros.map((m) => (
             <div key={m.usuarioId} className="list-row static">
@@ -100,12 +148,12 @@ export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocar
                 <strong>{m.nome}</strong> <span className="muted">· {m.login} · {m.papel === "dono" ? "dono" : m.situacao}</span>
               </span>
               {m.papel !== "dono" && m.situacao !== "aprovado" && (
-                <button type="button" className="btn btn-primary" onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "aprovado"), `${m.nome} aprovado(a).`)}>
+                <button type="button" className="btn btn-primary" aria-label={`Aprovar ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "aprovado"), `${m.nome} aprovado(a).`)}>
                   Aprovar
                 </button>
               )}
               {m.papel !== "dono" && m.situacao !== "recusado" && (
-                <button type="button" className="btn" onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "recusado"), `${m.nome} removido(a).`)}>
+                <button type="button" className="btn" aria-label={`${m.situacao === "aprovado" ? "Remover" : "Recusar"} ${m.nome}`} onClick={() => agir(() => decidirMembro(preparo.id, m.usuarioId, "recusado"), `${m.nome} removido(a).`)}>
                   {m.situacao === "aprovado" ? "Remover" : "Recusar"}
                 </button>
               )}
@@ -135,46 +183,14 @@ export const ContaView: React.FC<ContaViewProps> = ({ usuario, preparo, onTrocar
       {ehAdmin && (
         <section className="card">
           <h2 className="card-title">Usuários do sistema</h2>
-          {usuarios.map((u) => (
-            <div key={u.id} className="list-row static" style={{ flexWrap: "wrap" }}>
-              <span>
-                <strong>{u.nome}</strong> <span className="muted">· {u.login} · {u.papel} · {SITUACAO_USUARIO[u.situacao]}</span>
-              </span>
-              <span style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                {u.situacao !== "ativo" && (
-                  <button type="button" className="btn btn-primary" onClick={() => agir(() => editarUsuario(u.id, { situacao: "ativo" }), `${u.nome} liberado(a).`)}>
-                    {u.situacao === "pendente" ? "Aprovar" : "Reativar"}
-                  </button>
-                )}
-                {u.situacao === "ativo" && u.id !== usuario.id && (
-                  <button type="button" className="btn" onClick={() => agir(() => editarUsuario(u.id, { situacao: "inativo" }), `${u.nome} desativado(a).`)}>
-                    Desativar
-                  </button>
-                )}
-                <button type="button" className="btn" onClick={() => setNovaSenhaDe({ id: u.id, senha: "" })}>Nova senha</button>
-              </span>
-              {novaSenhaDe?.id === u.id && (
-                <form
-                  style={{ display: "flex", gap: "6px", width: "100%" }}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void agir(() => editarUsuario(u.id, { senha: novaSenhaDe.senha }), `Senha de ${u.nome} redefinida.`).then(() => setNovaSenhaDe(null));
-                  }}
-                >
-                  <input
-                    className="input"
-                    type="password"
-                    autoComplete="new-password"
-                    aria-label={`Nova senha de ${u.nome}`}
-                    placeholder="Nova senha (mín. 8)"
-                    value={novaSenhaDe.senha}
-                    onChange={(e) => setNovaSenhaDe({ id: u.id, senha: e.target.value })}
-                  />
-                  <button type="submit" className="btn btn-primary" disabled={novaSenhaDe.senha.length < 8}>Salvar</button>
-                </form>
-              )}
-            </div>
-          ))}
+          <p className="muted">
+            {cadastrosPendentes > 0
+              ? `${cadastrosPendentes} ${cadastrosPendentes === 1 ? "cadastro aguarda" : "cadastros aguardam"} aprovação.`
+              : "Nenhum cadastro aguardando aprovação."}
+          </p>
+          <button type="button" className={cadastrosPendentes > 0 ? "btn btn-primary" : "btn"} onClick={onAbrirUsuarios}>
+            Gerenciar usuários
+          </button>
         </section>
       )}
     </div>

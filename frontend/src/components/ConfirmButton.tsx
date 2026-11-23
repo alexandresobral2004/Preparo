@@ -7,6 +7,8 @@ interface ConfirmButtonProps {
   className?: string;
   small?: boolean;
   ariaLabel?: string;
+  /** Anexado ao nome acessível nos dois estados (ex.: a data do registro), sem mudar o texto visível. */
+  contexto?: string;
 }
 
 /**
@@ -19,6 +21,7 @@ export const ConfirmButton: React.FC<ConfirmButtonProps> = ({
   className = "",
   small = false,
   ariaLabel,
+  contexto,
 }) => {
   const [armed, setArmed] = useState(false);
 
@@ -42,7 +45,7 @@ export const ConfirmButton: React.FC<ConfirmButtonProps> = ({
       type="button"
       className={`btn btn-danger ${small ? "btn-sm" : ""} ${armed ? "confirming" : ""} ${className}`}
       onClick={handleClick}
-      aria-label={ariaLabel || (armed ? confirmLabel : label)}
+      aria-label={ariaLabel || `${armed ? confirmLabel : label}${contexto ? ` ${contexto}` : ""}`}
     >
       {armed ? confirmLabel : label}
     </button>

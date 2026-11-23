@@ -194,6 +194,7 @@ _COLUNAS_NOVAS: dict[str, list[tuple[str, str]]] = {
     ],
     "lembretes": [("preparo_id", "TEXT")],
     "panelas": [("peso_com_agua_kg", "REAL")],
+    "usuarios": [("grau", "TEXT NOT NULL DEFAULT ''"), ("nucleo", "TEXT NOT NULL DEFAULT ''")],
 }
 
 

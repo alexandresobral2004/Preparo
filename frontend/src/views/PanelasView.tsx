@@ -21,7 +21,6 @@ interface PanelasViewProps {
   prediction: PredictResponse | null;
   onChange: (updated: PreparoDraft) => void;
   onSave: () => void;
-  onNewPreparo: () => void;
   /** Nome de quem está logado: já vem preenchido em "Quem está anotando" nos blocos novos. */
   anotadorPadrao: string;
   saving: boolean;
@@ -42,7 +41,6 @@ export const PanelasView: React.FC<PanelasViewProps> = ({
   prediction,
   onChange,
   onSave,
-  onNewPreparo,
   anotadorPadrao,
   saving,
 }) => {
@@ -212,7 +210,6 @@ export const PanelasView: React.FC<PanelasViewProps> = ({
           >
             {saving ? "Salvando..." : "Salvar registro"}
           </button>
-          <ConfirmButton label="Novo preparo" onConfirm={onNewPreparo} />
         </div>
       </section>
     </div>

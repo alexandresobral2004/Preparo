@@ -38,6 +38,16 @@ export class ConflitoRascunhoError extends Error {
   }
 }
 
+/**
+ * Texto de erro vindo do servidor. Erro de validação (422) chega como lista de objetos
+ * com mensagens em inglês, que não se mostram ao usuário: usa uma frase fixa em português.
+ */
+export function mensagemDoDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail || null;
+  if (Array.isArray(detail)) return "Confira os dados informados.";
+  return null;
+}
+
 export async function apiFetch<T>(
   url: string,
   init?: RequestInit,
@@ -56,7 +66,8 @@ export async function apiFetch<T>(
     let body: { detail?: unknown; atual?: PreparoDraft | null } | null = null;
     try {
       body = await res.json();
-      if (body?.detail) message = String(body.detail);
+      const detalhe = mensagemDoDetail(body?.detail);
+      if (detalhe) message = detalhe;
     } catch {
       // ignora parse de erro não JSON
     }

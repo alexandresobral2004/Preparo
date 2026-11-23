@@ -37,7 +37,7 @@ import {
   draftFromSavedRegistro,
   estadoPanela,
 } from "./domain/calc";
-import { TopBar } from "./components/TopBar";
+import { TopBar, type StatusSalvamento } from "./components/TopBar";
 import { BottomNav } from "./components/BottomNav";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { CabecalhoView } from "./views/CabecalhoView";
@@ -46,9 +46,10 @@ import { AndamentoView } from "./views/AndamentoView";
 import { RegistrosView } from "./views/RegistrosView";
 import { CalcPiView } from "./views/CalcPiView";
 import { ContaView } from "./views/ContaView";
+import { UsuariosView } from "./views/UsuariosView";
 import { mesclarRespostaDoRascunho } from "./domain/auth";
 
-const VALID_TABS: TabKey[] = ["cabecalho", "panelas", "andamento", "registros", "calc", "conta"];
+const VALID_TABS: TabKey[] = ["cabecalho", "panelas", "andamento", "registros", "calc", "conta", "usuarios"];
 
 function getInitialTab(): TabKey {
   try {
@@ -88,12 +89,28 @@ const INTERVALO_ATUALIZACAO_RASCUNHO_MS = 15000;
 interface AppProps {
   usuario: Usuario;
   preparo: PreparoResumo;
+  cadastrosPendentes: number;
+  onCadastrosPendentes: (quantidade: number) => void;
+  onUsuarioAtualizado: (usuario: Usuario) => void;
   onTrocarPreparo: () => void;
   onSair: () => void;
 }
 
-export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onSair }) => {
-  const [tab, setTab] = useState<TabKey>(getInitialTab);
+export const App: React.FC<AppProps> = ({
+  usuario,
+  preparo,
+  cadastrosPendentes,
+  onCadastrosPendentes,
+  onUsuarioAtualizado,
+  onTrocarPreparo,
+  onSair,
+}) => {
+  const ehAdmin = usuario.papel === "admin";
+  // Usuários é só do admin: se a última aba salva era essa e quem entra não é admin, abre a Conta.
+  const [tab, setTab] = useState<TabKey>(() => {
+    const salva = getInitialTab();
+    return salva === "usuarios" && !ehAdmin ? "conta" : salva;
+  });
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
   const [online, setOnline] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -115,13 +132,16 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const dirtyRef = useRef(false);
+  const [statusSalvamento, setStatusSalvamento] = useState<StatusSalvamento>("salvo");
+  // Só a resposta do salvamento mais recente atualiza o indicador.
+  const salvamentoSeqRef = useRef(0);
 
   const notify = useCallback((text: string, kind: "info" | "error" = "info") => {
     const id = Date.now();
     setToast({ id, text, kind });
     window.setTimeout(() => {
       setToast((curr) => (curr?.id === id ? null : curr));
-    }, 3200);
+    }, kind === "error" ? 6000 : 3200);
   }, []);
 
   // Tema claro/escuro (RU-09)
@@ -209,10 +229,16 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
       // ignore
     }
     dirtyRef.current = true;
+    const seq = ++salvamentoSeqRef.current;
+    setStatusSalvamento("salvando");
+    const marcar = (status: StatusSalvamento) => {
+      if (seq === salvamentoSeqRef.current) setStatusSalvamento(status);
+    };
     const timer = window.setTimeout(() => {
       void saveRascunho(draft)
         .then((doServidor) => {
           dirtyRef.current = false;
+          marcar("salvo");
           // Só versão e autoria vêm do servidor; o que foi digitado nesse meio tempo fica.
           setDraft((atual) => mesclarRespostaDoRascunho(atual, doServidor));
         })
@@ -220,6 +246,7 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
           if (err instanceof ConflitoRascunhoError) {
             dirtyRef.current = false;
             if (err.atual) {
+              marcar("salvo");
               setDraft(err.atual);
               notify("Outra pessoa alterou o preparo. A tela foi atualizada com a versão mais recente.", "error");
             } else {
@@ -228,6 +255,7 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
             }
             return;
           }
+          marcar("erro");
           setOnline(false);
         });
       void refreshPrediction(draft, config.metaLitrosPadrao);
@@ -341,6 +369,7 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
       notify("Registro excluído");
     } catch (err) {
       notify(err instanceof Error ? err.message : "Erro ao excluir registro.", "error");
+      throw err;
     }
   };
 
@@ -437,6 +466,16 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onSave={handleSaveRegistro}
         saving={saving}
+        statusSalvamento={statusSalvamento}
+        onSair={() => {
+          if (
+            statusSalvamento !== "salvo" &&
+            !window.confirm("Há alterações que ainda não foram salvas no servidor e serão perdidas. Sair mesmo assim?")
+          ) {
+            return;
+          }
+          onSair();
+        }}
       />
 
       <main className="app-main">
@@ -455,7 +494,6 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
             prediction={prediction}
             onChange={setDraft}
             onSave={handleSaveRegistro}
-            onNewPreparo={handleNewPreparo}
             anotadorPadrao={usuario.nome}
             saving={saving}
           />
@@ -491,9 +529,25 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
           <ContaView
             usuario={usuario}
             preparo={preparo}
+            cadastrosPendentes={cadastrosPendentes}
             onTrocarPreparo={onTrocarPreparo}
             onSair={onSair}
+            onAbrirUsuarios={() => setTab("usuarios")}
+            onNovoPreparo={async () => {
+              await handleNewPreparo();
+              setTab("panelas");
+            }}
+            onUsuarioAtualizado={onUsuarioAtualizado}
             onNotify={notify}
+          />
+        )}
+
+        {tab === "usuarios" && ehAdmin && (
+          <UsuariosView
+            usuarioLogado={usuario}
+            onVoltar={() => setTab("conta")}
+            onNotify={notify}
+            onPendentes={onCadastrosPendentes}
           />
         )}
       </main>
@@ -501,11 +555,11 @@ export const App: React.FC<AppProps> = ({ usuario, preparo, onTrocarPreparo, onS
       <Toast toast={toast} />
 
       <BottomNav
-        activeTab={tab}
+        activeTab={tab === "usuarios" ? "conta" : tab}
         onSelect={setTab}
         noFogoCount={noFogoBadgeCount}
         registrosCount={registros.length}
-        contaBadge={preparo.meuPapel === "dono" ? preparo.pendentes : 0}
+        contaBadge={(preparo.meuPapel === "dono" ? preparo.pendentes : 0) + (ehAdmin ? cadastrosPendentes : 0)}
       />
     </div>
   );

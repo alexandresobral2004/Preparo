@@ -19,3 +19,6 @@ backend/data/
 *.db-shm
 .env
 .env.*
+
+# livros de referência (PDF/MD, ~200 MB, direitos autorais): nunca versionar nem enviar no deploy
+pdfs/

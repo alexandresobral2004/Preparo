@@ -1,9 +1,19 @@
 import React from "react";
 import type { TabKey } from "../types";
 import { formatDateBr } from "../domain/format";
-import { MoonIcon, SunIcon } from "./Icons";
+import { LogOutIcon, MoonIcon, SunIcon } from "./Icons";
+
+export type StatusSalvamento = "salvando" | "salvo" | "erro";
+
+const ROTULO_SALVAMENTO: Record<StatusSalvamento, string> = {
+  salvando: "Salvando…",
+  salvo: "✓ Salvo",
+  erro: "Não salvo",
+};
 
 interface TopBarProps {
+  statusSalvamento: StatusSalvamento;
+  onSair: () => void;
   tab: TabKey;
   dataPreparo: string;
   mestre: string;
@@ -21,6 +31,7 @@ const TITLES: Record<TabKey, string> = {
   registros: "Registros",
   calc: "Calculadora π",
   conta: "Conta",
+  usuarios: "Usuários",
 };
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -32,6 +43,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleTheme,
   onSave,
   saving,
+  statusSalvamento,
+  onSair,
 }) => {
   const showSave = tab === "cabecalho" || tab === "panelas";
   const subtitle = `Preparo de ${formatDateBr(dataPreparo)}${mestre.trim() ? ` · ${mestre.trim()}` : ""}`;
@@ -45,6 +58,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className={`sync-dot ${online ? "" : "offline"}`}>
             {online ? "SQLite" : "Offline"}
           </span>
+          {showSave && (
+            <span className={`save-status ${statusSalvamento}`} role="status" aria-live="polite">
+              {ROTULO_SALVAMENTO[statusSalvamento]}
+            </span>
+          )}
         </div>
       </div>
 
@@ -57,6 +75,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           title={theme === "dark" ? "Tema claro" : "Tema escuro"}
         >
           {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-icon"
+          onClick={onSair}
+          aria-label="Sair"
+          title="Sair"
+        >
+          <LogOutIcon />
         </button>
 
         {showSave && (

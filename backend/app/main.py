@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth
@@ -25,12 +26,48 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+_ROTULOS_CAMPOS = {
+    "login": "Login",
+    "nome": "Nome",
+    "senha": "Senha",
+    "novaSenha": "Nova senha",
+    "senhaAtual": "Senha atual",
+    "grau": "Grau",
+    "nucleo": "Núcleo",
+}
+
+
+def _frase_do_erro(erro: dict) -> str:
+    """Traduz um erro do Pydantic em frase. Nunca usa o valor digitado nem o contexto técnico."""
+    campo = next((p for p in reversed(erro["loc"]) if isinstance(p, str) and p != "body"), "campo")
+    rotulo = _ROTULOS_CAMPOS.get(campo, campo)
+    tipo, ctx = erro["type"], erro.get("ctx", {})
+    if tipo == "missing":
+        return f"Informe {rotulo}."
+    if tipo == "string_too_short":
+        return f"{rotulo} deve ter pelo menos {ctx['min_length']} caracteres."
+    if tipo == "string_too_long":
+        return f"{rotulo} deve ter no máximo {ctx['max_length']} caracteres."
+    if tipo == "string_pattern_mismatch":
+        return f"{rotulo} só aceita letras, números, ponto, hífen e sublinhado."
+    if tipo == "literal_error":
+        return f"Escolha um valor válido para {rotulo}."
+    if tipo == "value_error":
+        return erro["msg"].removeprefix("Value error, ")
+    return f"Confira o campo {rotulo}."
+
+
+async def _erro_de_validacao(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": " ".join(_frase_do_erro(e) for e in exc.errors())})
+
+
 def create_app(dist_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="Preparo de Vegetal v2 API",
         version="2.0.0",
         lifespan=lifespan,
     )
+    app.add_exception_handler(RequestValidationError, _erro_de_validacao)
 
     # Por padrão só a mesma origem acessa a API (o Vite usa proxy no desenvolvimento).
     origens = [o.strip() for o in os.environ.get("PREPARO_CORS_ORIGINS", "").split(",") if o.strip()]

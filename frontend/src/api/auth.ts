@@ -12,16 +12,30 @@ export async function entrar(login: string, senha: string): Promise<Usuario> {
   return r.usuario;
 }
 
-export async function cadastrar(login: string, nome: string, senha: string): Promise<string> {
-  const r = await apiFetch<{ mensagem: string }>("/api/auth/cadastro", post({ login, nome, senha }), SEM_EVENTO);
+export interface DadosCadastro {
+  login: string;
+  nome: string;
+  grau: string;
+  nucleo: string;
+  senha: string;
+}
+
+export async function cadastrar(dados: DadosCadastro): Promise<string> {
+  const r = await apiFetch<{ mensagem: string }>("/api/auth/cadastro", post(dados), SEM_EVENTO);
   return r.mensagem;
 }
 
-/** Usuário da sessão atual; null se não há sessão. Erro de rede é repassado (modo offline). */
-export async function fetchMe(): Promise<Usuario | null> {
+export interface SessaoAtual {
+  usuario: Usuario;
+  /** Só o admin recebe a contagem; para os demais fica 0. */
+  cadastrosPendentes: number;
+}
+
+/** Sessão atual; null se não há sessão. Erro de rede é repassado (modo offline). */
+export async function fetchMe(): Promise<SessaoAtual | null> {
   try {
-    const r = await apiFetch<{ usuario: Usuario }>("/api/auth/me", undefined, SEM_EVENTO);
-    return r.usuario;
+    const r = await apiFetch<{ usuario: Usuario; cadastrosPendentes?: number }>("/api/auth/me", undefined, SEM_EVENTO);
+    return { usuario: r.usuario, cadastrosPendentes: r.cadastrosPendentes ?? 0 };
   } catch (err) {
     if (err instanceof TypeError) throw err; // fetch falhou: sem rede
     return null;
@@ -37,8 +51,22 @@ export async function trocarSenha(senhaAtual: string, novaSenha: string): Promis
 }
 
 export const listarUsuarios = () => apiFetch<Usuario[]>("/api/usuarios");
-export const editarUsuario = (id: number, campos: Partial<Pick<Usuario, "nome" | "papel" | "situacao">> & { senha?: string }) =>
-  apiFetch<Usuario>(`/api/usuarios/${id}`, patch(campos));
+
+export interface DadosUsuarioNovo extends DadosCadastro {
+  papel: Usuario["papel"];
+}
+
+export type CamposUsuario = Partial<Pick<Usuario, "nome" | "grau" | "nucleo" | "papel" | "situacao">> & { senha?: string };
+
+export const criarUsuario = (dados: DadosUsuarioNovo) => apiFetch<Usuario>("/api/usuarios", post(dados));
+export const editarUsuario = (id: number, campos: CamposUsuario) => apiFetch<Usuario>(`/api/usuarios/${id}`, patch(campos));
+
+/** Apaga o usuário, ou o anonimiza quando ele tem histórico (anonimizado: true). */
+export const excluirUsuario = (id: number) =>
+  apiFetch<{ anonimizado: boolean }>(`/api/usuarios/${id}`, { method: "DELETE" });
+
+export const editarPerfil = (campos: { nome?: string; grau?: string; nucleo?: string }) =>
+  apiFetch<Usuario>("/api/auth/perfil", patch(campos));
 
 export const listarPreparos = () => apiFetch<PreparoResumo[]>("/api/preparos");
 export const criarPreparo = (nome: string) => apiFetch<{ id: string; nome: string }>("/api/preparos", post({ nome }));

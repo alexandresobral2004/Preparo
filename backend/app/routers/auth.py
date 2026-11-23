@@ -2,17 +2,34 @@
 
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from .. import auth
 from ..database import db_session, now_iso
-from ..schemas import CadastroIn, LoginIn, TrocaSenhaIn
+from ..schemas import CadastroIn, LoginIn, PerfilEdicao, TrocaSenhaIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _MSG_LOGIN_INVALIDO = "Login ou senha inválidos."
+
+
+def _ip_do_cliente(request: Request) -> str:
+    """IP que o proxy da Railway acrescentou ao X-Forwarded-For; senão o IP direto.
+
+    O primeiro elemento vem do cliente e pode ser forjado a cada requisição, então não serve de chave.
+    """
+    # getlist junta cabeçalhos repetidos: se o proxy acrescentar o IP numa linha nova, o último é o dele.
+    encaminhado = ",".join(request.headers.getlist("x-forwarded-for")).split(",")[-1].strip()
+    if encaminhado:
+        return encaminhado
+    return request.client.host if request.client else "desconhecido"
+
+
+def _contar_pendentes(conn: sqlite3.Connection) -> int:
+    return conn.execute("SELECT COUNT(*) FROM usuarios WHERE situacao = 'pendente'").fetchone()[0]
 
 
 @router.post("/login")
@@ -45,18 +62,21 @@ def login(body: LoginIn, response: Response) -> dict[str, Any]:
 
 
 @router.post("/cadastro", status_code=201)
-def cadastro(body: CadastroIn) -> dict[str, str]:
+def cadastro(body: CadastroIn, request: Request) -> dict[str, str]:
     """Autocadastro: a conta nasce pendente e só entra depois que o administrador aprovar."""
+    chave_ip = "cadastro:" + _ip_do_cliente(request)
+    if auth.bloqueado(chave_ip):
+        raise HTTPException(status_code=429, detail="Muitos cadastros deste endereço. Aguarde 15 minutos e tente de novo.")
+    auth.registrar_falha(chave_ip)  # conta cada tentativa, não só as recusadas
     with db_session() as conn:
         if conn.execute("SELECT 1 FROM usuarios WHERE login = ?", (body.login,)).fetchone():
             raise HTTPException(status_code=409, detail="Esse login já está em uso.")
-        pendentes = conn.execute("SELECT COUNT(*) FROM usuarios WHERE situacao = 'pendente'").fetchone()[0]
-        if pendentes >= auth.MAX_PENDENTES:
+        if _contar_pendentes(conn) >= auth.MAX_PENDENTES:
             raise HTTPException(status_code=429, detail="Há cadastros demais aguardando aprovação. Tente mais tarde.")
         conn.execute(
-            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at) "
-            "VALUES (?, ?, ?, 'usuario', 'pendente', ?)",
-            (body.login, body.nome.strip(), auth.hash_senha(body.senha), now_iso()),
+            "INSERT INTO usuarios (login, nome, senha_hash, papel, situacao, created_at, grau, nucleo) "
+            "VALUES (?, ?, ?, 'usuario', 'pendente', ?, ?, ?)",
+            (body.login, body.nome, auth.hash_senha(body.senha), now_iso(), body.grau or "", body.nucleo or ""),
         )
     return {"mensagem": "Cadastro enviado. Você poderá entrar quando o administrador aprovar."}
 
@@ -73,7 +93,23 @@ def logout(request: Request, response: Response) -> dict[str, bool]:
 
 @router.get("/me")
 def me(usuario: dict[str, Any] = Depends(auth.exigir_login)) -> dict[str, Any]:
-    return {"usuario": usuario}
+    if usuario["papel"] != "admin":
+        return {"usuario": usuario}
+    with db_session() as conn:
+        return {"usuario": usuario, "cadastrosPendentes": _contar_pendentes(conn)}
+
+
+@router.patch("/perfil")
+def editar_perfil(body: PerfilEdicao, usuario: dict[str, Any] = Depends(auth.exigir_login)) -> dict[str, Any]:
+    """Nome, grau e núcleo de quem está logado. Papel e situação não são alterados aqui."""
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE usuarios SET nome = COALESCE(?, nome), grau = COALESCE(?, grau), nucleo = COALESCE(?, nucleo) "
+            "WHERE id = ?",
+            (body.nome, body.grau, body.nucleo, usuario["id"]),
+        )
+        atualizado = conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario["id"],)).fetchone()
+        return auth.usuario_publico(atualizado)
 
 
 @router.post("/senha")

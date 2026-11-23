@@ -24,6 +24,7 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
   onRescueJson,
 }) => {
   const [importText, setImportText] = useState("");
+  const [erroExclusao, setErroExclusao] = useState<{ id: string; msg: string } | null>(null);
   const [rescueText, setRescueText] = useState("");
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -172,17 +173,27 @@ export const RegistrosView: React.FC<RegistrosViewProps> = ({
                   ))}
                 </div>
 
+                {erroExclusao?.id === reg.id && (
+                  <div className="alert-box alert-danger" role="alert">{erroExclusao.msg}</div>
+                )}
                 <div className="row-actions">
                   <button
                     type="button"
                     className="btn btn-primary"
+                    aria-label={`Abrir registro de ${formatDateBr(reg.data)}`}
                     onClick={() => onOpenRegistro(reg)}
                   >
                     Abrir
                   </button>
                   <ConfirmButton
                     label="Excluir"
-                    onConfirm={() => void onDeleteRegistro(reg.id)}
+                    contexto={`registro de ${formatDateBr(reg.data)}`}
+                    onConfirm={() => {
+                      setErroExclusao(null);
+                      onDeleteRegistro(reg.id).catch((err: unknown) =>
+                        setErroExclusao({ id: reg.id, msg: err instanceof Error ? err.message : "Erro ao excluir registro." }),
+                      );
+                    }}
                   />
                 </div>
               </article>
