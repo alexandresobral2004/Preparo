@@ -7,6 +7,16 @@ interface LoginViewProps {
   onEntrou: (usuario: Usuario) => void;
 }
 
+const FUNCIONALIDADES = [
+  { titulo: "Panelas e blocos", texto: "Registre entrada, fervura e colheita de até 5 panelas por bloco, com pesos e litros." },
+  { titulo: "Previsão de colheita", texto: "Litros estimados agora, horário previsto de retirada e projeção a cada 30 minutos de fervura." },
+  { titulo: "Aprendizado", texto: "A previsão melhora a cada colheita e se ajusta ao fogo de cada bloco." },
+  { titulo: "Alertas", texto: "Aponta o que falta preencher e panelas sem fervura ou sem colheita há muito tempo." },
+  { titulo: "Equipe", texto: "Vários preparos, com dono, membros e permissão de editar ou só acompanhar." },
+  { titulo: "Andamento e lembretes", texto: "Acompanhe o dia, crie lembretes e defina a meta de litros." },
+  { titulo: "Uso no dia a dia", texto: "Rascunho automático, exportação em CSV e JSON e instalação como app, com uso offline." },
+];
+
 export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
   const [login, setLogin] = useState("");
@@ -67,8 +77,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
 
   return (
     <div className="auth-screen">
-      <form className="card auth-card" onSubmit={enviar} noValidate>
-        <h1 className="card-title">Preparo de Vegetal</h1>
+      <div className="auth-topo">
+        <section className="auth-hero" aria-labelledby="auth-hero-titulo">
+          <img className="auth-hero-foto" src="/img/login-lago.jpg" alt="" aria-hidden="true" />
+          <div className="auth-hero-texto">
+            <h1 id="auth-hero-titulo" className="auth-hero-titulo">Monitor de Preparo</h1>
+            <p className="auth-hero-lead">
+              Acompanhe cada panela, da entrada no fogo até a colheita, e saiba quantos litros ela terá e quando tirar.
+            </p>
+          </div>
+        </section>
+
+        <div className="auth-form-col">
+          <form className="card auth-card" onSubmit={enviar} noValidate>
+        <h2 className="card-title">{modo === "entrar" ? "Entrar" : "Criar conta"}</h2>
         <p className="muted">{modo === "entrar" ? "Entre com seu e-mail ou login e senha." : "Crie sua conta para participar."}</p>
 
         {aviso && <div className="alert-box alert-warn" role="status">{aviso}</div>}
@@ -191,7 +213,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onEntrou }) => {
         <button type="button" className="btn" onClick={() => trocarModo(modo === "entrar" ? "cadastrar" : "entrar")}>
           {modo === "entrar" ? "Criar conta" : "Já tenho conta"}
         </button>
-      </form>
+          </form>
+        </div>
+      </div>
+
+      <section className="landing" aria-labelledby="landing-titulo">
+        <h2 id="landing-titulo" className="landing-titulo">O que o Monitor de Preparo faz</h2>
+        <div className="landing-grade">
+          {FUNCIONALIDADES.map((f) => (
+            <article key={f.titulo} className="card landing-card">
+              <h3 className="landing-card-titulo">{f.titulo}</h3>
+              <p className="muted">{f.texto}</p>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

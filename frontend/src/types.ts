@@ -131,6 +131,11 @@ export interface CurvaPonto {
   litros: number;
 }
 
+export interface ProjecaoPonto {
+  minutos: number; // minutos de fervura
+  litros: number;
+}
+
 export interface PanelaPrediction {
   disponivel: boolean;
   usaPesos?: boolean;
@@ -155,6 +160,7 @@ export interface PanelaPrediction {
   maeMinutos?: number | null;
   r2?: number | null;
   curva?: CurvaPonto[];
+  projecao?: ProjecaoPonto[];
   aviso?: string | null;
 }
 

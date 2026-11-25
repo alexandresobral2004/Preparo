@@ -797,10 +797,7 @@ fieldset:disabled select {
 /* Login, escolha de preparo e conta */
 .auth-screen {
   min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  display: block;
 }
 
 .auth-card {
@@ -813,6 +810,122 @@ fieldset:disabled select {
 
 .auth-card.auth-wide {
   max-width: 560px;
+}
+
+/* Topo da tela de login: foto na lateral esquerda inteira, formulário à direita */
+.auth-topo {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.auth-hero {
+  position: relative;
+  min-height: 260px;
+  color: #fff;
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.auth-hero-foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.auth-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.1));
+}
+
+.auth-hero-texto {
+  position: relative;
+  z-index: 1;
+  padding: 24px;
+}
+
+.auth-hero-titulo {
+  margin: 0 0 8px;
+  font-size: 1.8rem;
+}
+
+.auth-hero-lead {
+  margin: 0;
+  opacity: 0.95;
+}
+
+.auth-form-col {
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+/* Landing abaixo do login */
+.landing {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.landing-titulo {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.landing-grade {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.landing-card {
+  margin: 0;
+}
+
+.landing-card-titulo {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+@media (min-width: 900px) {
+  .auth-topo {
+    flex-direction: row;
+    height: 100dvh;
+    min-height: 620px;
+  }
+
+  .auth-hero {
+    flex: 1 1 0;
+    min-height: 100%;
+  }
+
+  .auth-hero-texto {
+    padding: 48px;
+  }
+
+  .auth-hero-titulo {
+    font-size: 2.6rem;
+  }
+
+  .auth-form-col {
+    flex: 0 0 440px;
+    align-items: center;
+    padding: 24px;
+  }
+
+  .auth-form-col .auth-card {
+    max-width: 380px;
+  }
+
+  .landing-grade {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .list-stack {

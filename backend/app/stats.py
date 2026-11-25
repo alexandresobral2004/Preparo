@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,6 +39,11 @@ MIN_ALPHA = 0.15
 MAX_ALPHA = 1.15
 MIN_AMOSTRAS_AGUA = 6  # amostras com água informada para o modelo passar a usá-la
 MIN_BETA_AGUA, MAX_BETA_AGUA = -0.5, 2.0  # litros de líquido por litro de água; o ponto de partida é 0 (sem efeito)
+
+# Fator de fornalha do bloco: razão entre o tempo real e o previsto para cada panela já colhida.
+FATOR_PRIOR_PANELAS = 2.0  # peso do prior "fogo normal" (fator 1); com poucas colhidas o fator fica perto de 1
+FATOR_POR_PANELA_LIMITE = (0.5, 2.0)
+FATOR_FORNALHA_LIMITE = (0.6, 1.6)
 
 
 @dataclass(frozen=True)
@@ -414,6 +420,42 @@ def _compute_fervura_elapsed_min(
     return float(ferv_elapsed) if ferv_elapsed is not None else None
 
 
+def fator_fornalha(panelas_bloco: list[dict[str, Any]], samples: list[HistoricalSample]) -> float:
+    """Quanto o fogo deste bloco está mais rápido (<1) ou mais lento (>1) que o modelo.
+
+    Compara o tempo real de cada panela já colhida com o tempo que o modelo previa para
+    tirar os mesmos litros. A média é geométrica e encolhida para 1 quando há poucas panelas.
+    """
+    logs: list[float] = []
+    modelos: dict[str, CalibratedModel] = {}
+    for pan in panelas_bloco:
+        if estado_panela(pan) != "colhida":
+            continue
+        tipo = normalizar_tipo(pan.get("tipo"))
+        peso_seca = try_parse_decimal_ptbr(pan.get("pesoSecaKg"))
+        peso_cheia = try_parse_decimal_ptbr(pan.get("pesoCheiaKg"))
+        litros = try_parse_decimal_ptbr(pan.get("litros"))
+        if peso_seca is None or peso_cheia is None or peso_cheia <= peso_seca or not litros:
+            continue
+        t_real = diff_minutes(pan.get("fervura"), pan.get("colhida"))
+        if t_real is None or t_real < 1:
+            continue
+        if tipo not in modelos:
+            modelos[tipo] = fit_model_for_type(samples, tipo)
+        agua = agua_derivada(peso_cheia, try_parse_decimal_ptbr(pan.get("pesoComAguaKg")))
+        t_previsto = modelos[tipo].predict_target_minutes(
+            tipo, peso_cheia - peso_seca, peso_seca, litros, agua
+        )
+        if t_previsto <= 0:
+            continue
+        razao = min(max(t_real / t_previsto, FATOR_POR_PANELA_LIMITE[0]), FATOR_POR_PANELA_LIMITE[1])
+        logs.append(math.log(razao))
+    if not logs:
+        return 1.0
+    fator = math.exp(sum(logs) / (len(logs) + FATOR_PRIOR_PANELAS))
+    return min(max(fator, FATOR_FORNALHA_LIMITE[0]), FATOR_FORNALHA_LIMITE[1])
+
+
 def predict_panela(
     panela: dict[str, Any],
     data_preparo: str,
@@ -421,8 +463,13 @@ def predict_panela(
     *,
     meta_litros_padrao: float = 10.15,
     now_dt: datetime | None = None,
+    fator_fornalha: float = 1.0,
 ) -> dict[str, Any]:
-    """Gera a predição completa em tempo real para uma panela."""
+    """Gera a predição completa em tempo real para uma panela.
+
+    fator_fornalha < 1 significa fogo mais rápido que o modelo: o tempo até o alvo encurta
+    na mesma proporção. Tempo real vira tempo do modelo dividindo pelo fator.
+    """
     now = now_dt or datetime.now()
     estado = estado_panela(panela)
     tipo = normalizar_tipo(panela.get("tipo"))
@@ -450,11 +497,13 @@ def predict_panela(
         model = fit_model_for_type(samples, tipo)
 
         v0 = model.initial_volume(tipo, delta_p, peso_seca, agua)
-        t_alvo = model.predict_target_minutes(tipo, delta_p, peso_seca, meta_litros, agua)
+        t_alvo = model.predict_target_minutes(tipo, delta_p, peso_seca, meta_litros, agua) * fator_fornalha
         t_ferv_atual = _compute_fervura_elapsed_min(entrada, fervura, data_preparo, now)
 
         t_for_eval = t_ferv_atual if t_ferv_atual is not None else 0.0
-        litros_atuais = model.predict_liters_at(tipo, delta_p, peso_seca, t_for_eval, agua)
+        litros_atuais = model.predict_liters_at(
+            tipo, delta_p, peso_seca, t_for_eval / fator_fornalha, agua
+        )
         minutos_restantes = round(t_alvo - t_for_eval) if t_ferv_atual is not None else round(t_alvo)
         horario_previsto = add_minutes(fervura, t_alvo) if fervura else None
 
@@ -474,12 +523,24 @@ def predict_panela(
         if t_ferv_atual is not None:
             progresso = max(0.0, min(100.0, ((v0 - litros_atuais) / denom) * 100.0))
 
+        # Projeção em marcos de 30 min de fervura: litros previstos antes de a panela chegar ao ponto
+        ate_min = max(t_alvo * 1.15, 60.0)
+        projecao = [
+            {
+                "minutos": m,
+                "litros": round(model.predict_liters_at(tipo, delta_p, peso_seca, m / fator_fornalha, agua), 2),
+            }
+            for m in range(30, int(math.ceil(ate_min / 30.0)) * 30 + 1, 30)
+        ]
+
         # Curva de redução de 7 pontos para gráfico compacto
         horizon = max(t_alvo * 1.15, (t_for_eval + 30.0) if t_ferv_atual else t_alvo, 60.0)
         curva = [
             {
                 "min": round(horizon * i / 6.0),
-                "litros": round(model.predict_liters_at(tipo, delta_p, peso_seca, horizon * i / 6.0, agua), 2),
+                "litros": round(
+                    model.predict_liters_at(tipo, delta_p, peso_seca, horizon * i / 6.0 / fator_fornalha, agua), 2
+                ),
             }
             for i in range(7)
         ]
@@ -494,7 +555,8 @@ def predict_panela(
             "pesoLiquidoInicialKg": round(delta_p, 2),
             "litrosIniciaisEstimados": round(v0, 2),
             "litrosAtuaisEstimados": round(litros_atuais, 2),
-            "taxaEvaporacaoLh": round(model.rate_l_per_min * 60.0, 2),
+            "taxaEvaporacaoLh": round(model.rate_l_per_min * 60.0 / fator_fornalha, 2),
+            "fatorFornalha": round(fator_fornalha, 2),
             "tempoFervuraAtualMin": round(t_ferv_atual) if t_ferv_atual is not None else None,
             "tempoFervuraAlvoMin": round(t_alvo),
             "minutosRestantes": minutos_restantes,
@@ -508,6 +570,7 @@ def predict_panela(
             "maeMinutos": model.mae_minutos,
             "r2": model.r2,
             "curva": curva,
+            "projecao": projecao,
             "aviso": (
                 "Já passou do ponto estimado"
                 if (t_ferv_atual is not None and minutos_restantes <= 0)

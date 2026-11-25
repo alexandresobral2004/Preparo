@@ -12,6 +12,7 @@ from ..domain import calcular_metricas_bloco, calcular_totais_por_tipo, estado_p
 from ..preparos import preparo_atual
 from ..schemas import PredictRequest
 from ..stats import (
+    fator_fornalha,
     list_distinct_dry_weights,
     load_historical_samples,
     predict_panela,
@@ -42,6 +43,7 @@ def predict_blocos(body: PredictRequest, preparo: dict[str, Any] = Depends(prepa
 
     for b_idx, bloco in enumerate(blocos_dict):
         panelas_out: list[dict[str, Any]] = []
+        fator = fator_fornalha(bloco.get("panelas") or [], samples)
         for p_idx, pan in enumerate(bloco.get("panelas") or []):
             numero = pan.get("numero") or (b_idx * 5 + p_idx + 1)
             pan_with_num = {**pan, "numero": numero}
@@ -59,6 +61,7 @@ def predict_blocos(body: PredictRequest, preparo: dict[str, Any] = Depends(prepa
                 samples,
                 meta_litros_padrao=meta_padrao,
                 now_dt=now_dt,
+                fator_fornalha=fator,
             )
 
             if est in {"no_fogo", "fervendo"}:

@@ -112,6 +112,14 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
             {predicao.litrosIniciaisEstimados != null &&
               ` · Inicial ~${formatPtBr(predicao.litrosIniciaisEstimados, 1)} L`}
           </div>
+          {predicao.projecao && predicao.projecao.length > 0 && (
+            <div className="muted tabular">
+              Com fervura de:{" "}
+              {predicao.projecao
+                .map((p) => `${formatDurationMin(p.minutos)} ~${formatPtBr(p.litros, 1)} L`)
+                .join(" · ")}
+            </div>
+          )}
         </>
       ) : (
         <div className="muted">

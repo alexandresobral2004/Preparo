@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from app.domain import add_minutes
-from app.stats import HistoricalSample, fit_model_for_type, predict_panela
+from app.stats import HistoricalSample, fator_fornalha, fit_model_for_type, predict_panela
 
 
 def test_cold_start_com_pesos_e_meta_10_15() -> None:
@@ -187,3 +187,51 @@ def test_agua_das_amostras_vem_da_diferenca_entre_os_pesos(tmp_path) -> None:
         )
         aguas = sorted((s.agua is None, s.agua) for s in load_historical_samples(conn, "p1"))
     assert aguas == [(False, 20.0), (True, None), (True, None)]
+
+
+def _amostras_2a_vez() -> list[HistoricalSample]:
+    return [
+        HistoricalSample("2ª vez", t_ferv=100, litros=18.0, peso_seca=12.0, peso_cheia=42.0),
+        HistoricalSample("2ª vez", t_ferv=150, litros=15.0, peso_seca=12.0, peso_cheia=42.0),
+        HistoricalSample("2ª vez", t_ferv=120, litros=13.0, peso_seca=10.0, peso_cheia=35.0),
+    ]
+
+
+def test_fator_fornalha_sem_panela_colhida_no_bloco_e_neutro() -> None:
+    bloco = [{"tipo": "2ª vez", "entrada": "22:30", "fervura": "23:10", "pesoSecaKg": 12, "pesoCheiaKg": 32}]
+    assert fator_fornalha(bloco, _amostras_2a_vez()) == 1.0
+
+
+def test_panela_colhida_mais_rapida_que_o_modelo_puxa_o_fator_para_baixo() -> None:
+    model = fit_model_for_type(_amostras_2a_vez(), "2ª vez")
+    t_previsto = model.predict_target_minutes("2ª vez", 20.0, 12.0, 10.0)
+    colhida = {
+        "tipo": "2ª vez", "pesoSecaKg": 12, "pesoCheiaKg": 32,
+        "fervura": "23:00", "colhida": add_minutes("23:00", round(t_previsto * 0.5)), "litros": 10.0,
+    }
+    fator = fator_fornalha([colhida], _amostras_2a_vez())
+    assert 0.6 < fator < 0.9  # bruto seria ~0.5; encolhido para 1 com poucas panelas
+
+
+def test_fator_fornalha_acelera_a_previsao_da_panela_em_fervura() -> None:
+    panela = {"tipo": "2ª vez", "entrada": "22:30", "fervura": "23:10", "pesoSecaKg": 12, "pesoCheiaKg": 32}
+    now = datetime(2026, 11, 22, 0, 10)
+    base = predict_panela(panela, "2026-11-21", samples=_amostras_2a_vez(), now_dt=now)
+    rapido = predict_panela(panela, "2026-11-21", samples=_amostras_2a_vez(), now_dt=now, fator_fornalha=0.8)
+    assert rapido["tempoFervuraAlvoMin"] == pytest.approx(base["tempoFervuraAlvoMin"] * 0.8, abs=1)
+    assert rapido["minutosRestantes"] < base["minutosRestantes"]
+    assert rapido["fatorFornalha"] == 0.8
+
+
+def test_projecao_mostra_litros_em_marcos_de_meia_hora_de_fervura() -> None:
+    samples = _amostras_2a_vez()
+    model = fit_model_for_type(samples, "2ª vez")
+    panela = {"tipo": "2ª vez", "entrada": "22:30", "fervura": "23:10", "pesoSecaKg": 12.0, "pesoCheiaKg": 32.0}
+    pred = predict_panela(panela, "2026-11-21", samples=samples, now_dt=datetime(2026, 11, 22, 0, 10))
+
+    projecao = {p["minutos"]: p["litros"] for p in pred["projecao"]}
+    assert sorted(projecao) == list(range(30, max(projecao) + 1, 30))
+    assert projecao[90] == pytest.approx(model.predict_liters_at("2ª vez", 20.0, 12.0, 90), abs=0.01)
+    valores = [projecao[m] for m in sorted(projecao)]
+    assert valores == sorted(valores, reverse=True)
+    assert projecao[max(projecao)] <= 10.15  # o horizonte passa do ponto de colheita
